@@ -1,0 +1,37 @@
+# --- Credenciales ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# --- Datos de ejecucion ---
+temp/
+logs/
+*.log
+output/txt/
+output/pdf/
+
+# --- Medios de prueba ---
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.wav
+*.m4a
+!assets/**
+
+# --- SO / editores ---
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/

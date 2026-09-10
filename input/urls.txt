@@ -1,0 +1,6 @@
+# Una URL de TikTok por linea.
+# Las lineas vacias y las que empiezan por # se ignoran.
+#
+# Ejemplo:
+# https://www.tiktok.com/@usuario/video/1111111111111111111
+# https://www.tiktok.com/@usuario/video/2222222222222222222

@@ -1,0 +1,12 @@
+# Normaliza fin de linea: LF en el repo, conversion automatica al hacer checkout.
+* text=auto eol=lf
+
+# Los .bat deben conservar CRLF para ejecutarse bien en Windows.
+*.bat text eol=crlf
+
+# Binarios: sin conversion ni diff textual.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.ttf binary

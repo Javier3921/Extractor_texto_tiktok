@@ -1,0 +1,33 @@
+# ==========================================================================
+# Extractor_texto_tiktok - Dependencias
+# Python 3.11+ (probado en 3.13). Windows 10/11.
+# Instalacion:  pip install -r requirements.txt
+# ==========================================================================
+
+# --- Descarga de video (TikTok y otros) -----------------------------------
+yt-dlp>=2024.8.6
+
+# --- FFmpeg embebido (fallback si no hay FFmpeg del sistema) --------------
+imageio-ffmpeg>=0.5.1
+
+# --- Transcripcion local (Whisper de OpenAI, corre sobre PyTorch) --------
+# Nota: openai-whisper arrastra torch, numpy, tiktoken, more-itertools...
+openai-whisper>=20231117
+
+# --- Deteccion de idioma (verificacion secundaria sobre el texto) --------
+langdetect>=1.0.9
+
+# --- Proveedores de IA ---------------------------------------------------
+#   OpenAI y DeepSeek usan este mismo SDK (DeepSeek via base_url).
+openai>=1.40.0
+#   Gemini: SDK unificado nuevo (google-generativeai quedo deprecado).
+google-genai>=0.3.0
+
+# --- Generacion de PDF -------------------------------------------------
+reportlab>=4.1.0
+
+# --- Configuracion .env -----------------------------------------------
+python-dotenv>=1.0.1
+
+# --- Tests (desarrollo) --------------------------------------------------
+pytest>=8.0.0
