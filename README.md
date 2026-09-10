@@ -34,6 +34,9 @@ URL de TikTok / archivo local
 > obtiene **solo la pista de audio** en un archivo temporal que se elimina al
 > finalizar.
 
+> 📄 **¿Cómo está construido?** Consulta el [**Informe técnico**](INFORME_TECNICO.md):
+> arquitectura, pipeline etapa por etapa, stack tecnológico y decisiones de diseño.
+
 ---
 
 ## Índice
