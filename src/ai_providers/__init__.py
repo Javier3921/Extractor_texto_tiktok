@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 
-def get_provider(name: str, cfg: "Config") -> AIProvider:
+def get_provider(name: str, cfg: "Config", *, timeout: float | None = None) -> AIProvider:
     """Devuelve una instancia lista para usar del proveedor pedido."""
     name = (name or "").lower()
     model = cfg.ai_model or _default_model(name)
@@ -34,7 +34,7 @@ def get_provider(name: str, cfg: "Config") -> AIProvider:
         return OpenAIProvider(cfg.openai_api_key, model)
     if name == "gemini":
         from src.ai_providers.gemini_provider import GeminiProvider
-        return GeminiProvider(cfg.gemini_api_key, model)
+        return GeminiProvider(cfg.gemini_api_key, model, timeout=timeout)
     if name == "deepseek":
         from src.ai_providers.deepseek_provider import DeepSeekProvider
         return DeepSeekProvider(cfg.deepseek_api_key, model)

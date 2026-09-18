@@ -290,12 +290,14 @@ class TempWorkspace:
     """Carpeta temporal por elemento procesado.
 
     Se borra al salir si todo fue bien; se conserva si hubo excepcion y
-    keep_on_error=True (util para depurar).
+    keep_on_error=True (util para depurar), o siempre si always_keep=True.
     """
 
-    def __init__(self, temp_root: Path, name: str, keep_on_error: bool = True):
+    def __init__(self, temp_root: Path, name: str, keep_on_error: bool = True,
+                 always_keep: bool = False):
         self.path = Path(temp_root) / sanitize_filename(name)
         self.keep_on_error = keep_on_error
+        self.always_keep = always_keep
         self._ok = False
 
     def __enter__(self) -> Path:
@@ -308,9 +310,11 @@ class TempWorkspace:
         self._ok = True
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        keep = (exc_type is not None or not self._ok) and self.keep_on_error
+        keep = self.always_keep or (
+            (exc_type is not None or not self._ok) and self.keep_on_error
+        )
         if keep:
-            get_logger().info("Carpeta temporal conservada para depuracion: %s", self.path)
+            get_logger().info("Carpeta temporal conservada: %s", self.path)
             return
         shutil.rmtree(self.path, ignore_errors=True)
 

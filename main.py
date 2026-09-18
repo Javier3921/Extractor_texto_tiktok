@@ -64,7 +64,7 @@ def load_config(args: argparse.Namespace) -> Config:
     if getattr(args, "model", None):
         cfg.transcription_model = args.model
     if getattr(args, "keep_temp", False):
-        cfg.keep_temp_on_error = True
+        cfg.always_keep_temp = True
     return cfg
 
 

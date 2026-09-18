@@ -69,6 +69,7 @@ class Config:
     max_video_mb: int = 200
     allow_mock_fallback: bool = False
     keep_temp_on_error: bool = True
+    always_keep_temp: bool = False
 
     # ---------------------------------------------------------------- build
     @classmethod

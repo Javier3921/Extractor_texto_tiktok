@@ -67,7 +67,8 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool) -> ProcessingR
         vid = local_stem(ref)
     result.video_id = vid
 
-    ws = TempWorkspace(cfg.temp_dir, f"job_{vid}", keep_on_error=cfg.keep_temp_on_error)
+    ws = TempWorkspace(cfg.temp_dir, f"job_{vid}", keep_on_error=cfg.keep_temp_on_error,
+                       always_keep=cfg.always_keep_temp)
     try:
         with ws as workdir:
             log.info("=== Inicio procesamiento (%s) id=%s provider=%s modelo_whisper=%s ===",
@@ -78,7 +79,8 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool) -> ProcessingR
             title = ""
             if kind == "url":
                 _step(1, "Obteniendo audio del TikTok (no se descarga el video)...")
-                media = fetch_audio(ref, workdir, timeout=cfg.network_timeout)
+                media = fetch_audio(ref, workdir, timeout=cfg.network_timeout,
+                                    max_mb=cfg.max_video_mb)
                 raw_media = media.audio_path
                 result.video_id = media.video_id or vid
                 vid = result.video_id
@@ -119,7 +121,7 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool) -> ProcessingR
 
             # -- 5. Traduccion + analisis con IA -----------------------
             _step(5, "Traduciendo/analizando con IA...")
-            provider = get_provider(provider_name, cfg)
+            provider = get_provider(provider_name, cfg, timeout=cfg.network_timeout)
             if provider_name == "mock" and cfg.ai_provider != "mock":
                 _info("Proveedor 'mock' en uso (sin clave del proveedor elegido). "
                       "El analisis NO es real.")
@@ -137,6 +139,9 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool) -> ProcessingR
                     provider=provider, is_spanish=True,
                 )
             result.translated = tr.translated
+            if tr.failed_segments:
+                _info(f"[AVISO] {tr.failed_segments} segmento(s) no se pudieron traducir; "
+                      "se dejo el texto original (mezcla de idiomas posible en el TXT/PDF).")
 
             spanish_segments = tr.spanish_segments
             original_segments = transcript.segments

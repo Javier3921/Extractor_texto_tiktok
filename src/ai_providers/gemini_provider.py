@@ -17,13 +17,13 @@ log = get_logger()
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 
-_MODEL_MOVED = re.compile(r"use\s+models/([A-Za-z0-9.\-]+)")
+_MODEL_MOVED = re.compile(r"use\s+models/([A-Za-z0-9.\-]+)", re.IGNORECASE)
 
 
 class GeminiProvider(AIProvider):
     name = "gemini"
 
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, timeout: float | None = None):
         super().__init__(api_key, model)
         if not api_key:
             raise AIAuthError(
@@ -32,12 +32,16 @@ class GeminiProvider(AIProvider):
             )
         try:
             from google import genai
+            from google.genai import types
         except ImportError as e:  # pragma: no cover
             raise AIProviderError(
                 "Falta el paquete 'google-genai' (pip install google-genai)."
             ) from e
         self._genai = genai
-        self._client = genai.Client(api_key=api_key)
+        # Sin esto una llamada colgada se queda esperando indefinidamente
+        # (el SDK no tiene timeout por defecto): usamos NETWORK_TIMEOUT del .env.
+        http_options = types.HttpOptions(timeout=int(timeout * 1000)) if timeout else None
+        self._client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _complete_raw(self, system: str, user: str, want_json: bool, max_tokens: int,
                       _allow_model_switch: bool = True) -> str:

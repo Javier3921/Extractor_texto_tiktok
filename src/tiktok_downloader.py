@@ -62,8 +62,13 @@ def is_tiktok_url(url: str) -> bool:
 # --------------------------------------------------------------------------
 # Descarga de audio
 # --------------------------------------------------------------------------
-def fetch_audio(url: str, workdir: Path, *, timeout: int = 30) -> RemoteMedia:
-    """Descarga SOLO el audio de la URL a `workdir` y devuelve sus metadatos."""
+def fetch_audio(url: str, workdir: Path, *, timeout: int = 30, max_mb: int = 0) -> RemoteMedia:
+    """Descarga SOLO el audio de la URL a `workdir` y devuelve sus metadatos.
+
+    `max_mb` (si > 0) limita el tamano del propio medio de origen que yt-dlp
+    descarga, para no gastar ancho de banda/disco con un video anormalmente
+    grande antes de saber si conviene procesarlo.
+    """
     url = url.strip()
     if not validate_url(url):
         raise ExtractorError(f"URL invalida: {url!r}")
@@ -96,6 +101,8 @@ def fetch_audio(url: str, workdir: Path, *, timeout: int = 30) -> RemoteMedia:
         "restrictfilenames": True,
         # nada de cookies ni credenciales: solo contenido publico
     }
+    if max_mb:
+        ydl_opts["max_filesize"] = max_mb * 1024 * 1024
     if ffmpeg:
         ydl_opts["ffmpeg_location"] = ffmpeg
 
@@ -138,6 +145,11 @@ def fetch_audio(url: str, workdir: Path, *, timeout: int = 30) -> RemoteMedia:
 
 def _friendly_download_error(err: Exception, url: str) -> ExtractorError:
     msg = str(err).lower()
+    if "max-filesize" in msg or "does not pass filesize filter" in msg:
+        return ExtractorError(
+            "El audio del video supera el limite MAX_VIDEO_MB configurado.\n"
+            "Ajusta MAX_VIDEO_MB en .env si quieres procesarlo igualmente."
+        )
     if any(k in msg for k in ("private", "login required", "sign in", "age-restricted",
                               "requested format is not available")):
         return ExtractorError(
