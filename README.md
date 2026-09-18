@@ -1,38 +1,41 @@
-# Extractor_texto_tiktok
+# 🎬 Extractor_texto_tiktok
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Licencia MIT" src="https://img.shields.io/badge/Licencia-MIT-green">
+  <img alt="Tests" src="https://github.com/Javier3921/Extractor_texto_tiktok/actions/workflows/tests.yml/badge.svg">
+  <img alt="Whisper" src="https://img.shields.io/badge/Transcripci%C3%B3n-Whisper-8A2BE2">
+  <img alt="Gemini" src="https://img.shields.io/badge/IA-Google%20Gemini-4285F4?logo=googlegemini&logoColor=white">
+  <img alt="Plataforma" src="https://img.shields.io/badge/Plataforma-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey">
+</p>
 
 Convierte un vídeo de **TikTok** (o un archivo de vídeo local) en un **informe
 técnico profesional en PDF, redactado íntegramente en español**.
 
-```
-URL de TikTok / archivo local
-        │
-        ▼
-   audio (temporal, se borra al terminar)
-        │
-        ▼
-     Whisper  ──►  transcripción con timestamps
-        │
-        ▼
- detección de idioma
-        │
-   ┌────┴─────────────┐
- español          inglés / otro
-   │                  │
-   │            traducción al español (IA)
-   │            + se conserva el original
-   └────┬─────────────┘
-        ▼
-   archivo .txt  (información + transcripción original + traducción)
-        ▼
-   análisis técnico con IA (anti-alucinación)
-        ▼
-   informe .pdf  (portada + 12 secciones, en español)
-```
+> **🔒 Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
+> se obtiene el **audio**, en un archivo temporal que se borra al terminar.
 
-> **Nota sobre la descarga:** por decisión de diseño, la aplicación **no
-> descarga ni guarda el vídeo**. Cuando le pasas una URL de TikTok, `yt-dlp`
-> obtiene **solo la pista de audio** en un archivo temporal que se elimina al
-> finalizar.
+```mermaid
+flowchart TD
+    A(["🔗 URL de TikTok<br/>o 📁 archivo local"]) --> B["🎧 Obtener audio<br/><sub>yt-dlp · SOLO audio, nunca vídeo</sub>"]
+    B --> C["🎚️ Normalizar audio<br/><sub>FFmpeg → WAV 16 kHz mono</sub>"]
+    C --> D["📝 Transcribir<br/><sub>Whisper (local u API)</sub>"]
+    D --> E{"🌐 ¿Idioma<br/>original?"}
+    E -- Español --> G["📄 Generar .txt"]
+    E -- "Inglés / otro" --> F["🌍 Traducir al español<br/><sub>IA · conserva el original</sub>"]
+    F --> G
+    G --> H["🧠 Analizar contenido<br/><sub>IA · anti-alucinación</sub>"]
+    H --> I(["📕 Informe .pdf<br/><sub>portada + 12 secciones</sub>"])
+
+    classDef entrada fill:#4285F4,stroke:#1a56c4,color:#fff
+    classDef proceso fill:#f4f6fb,stroke:#4285F4,color:#1a1a1a
+    classDef ia fill:#8A2BE2,stroke:#5b1a99,color:#fff
+    classDef salida fill:#34A853,stroke:#1e7a34,color:#fff
+    class A entrada
+    class B,C,D,G proceso
+    class F,H ia
+    class I salida
+```
 
 > 📄 **¿Cómo está construido?** Consulta el [**Informe técnico**](INFORME_TECNICO.md):
 > arquitectura, pipeline etapa por etapa, stack tecnológico y decisiones de diseño.
@@ -47,12 +50,14 @@ URL de TikTok / archivo local
 4. [Uso](#uso)
 5. [Detección de idioma y traducción](#detección-de-idioma-y-traducción)
 6. [Proveedores de IA](#proveedores-de-ia)
-7. [Archivos generados](#archivos-generados)
-8. [Estructura del proyecto](#estructura-del-proyecto)
-9. [Modelos de Whisper](#modelos-de-whisper)
-10. [Problemas comunes](#problemas-comunes)
-11. [Limitaciones](#limitaciones)
-12. [Consideraciones legales y de uso](#consideraciones-legales-y-de-uso)
+7. [Arquitectura del sistema](#arquitectura-del-sistema)
+8. [Seguridad](#seguridad)
+9. [Archivos generados](#archivos-generados)
+10. [Estructura del proyecto](#estructura-del-proyecto)
+11. [Modelos de Whisper](#modelos-de-whisper)
+12. [Problemas comunes](#problemas-comunes)
+13. [Limitaciones](#limitaciones)
+14. [Consideraciones legales y de uso](#consideraciones-legales-y-de-uso)
 
 ---
 
@@ -130,8 +135,8 @@ Edita `.env` y rellena la clave del proveedor que vayas a usar (ver abajo).
 | `OUTPUT_DIRECTORY` | ruta | `output` | Carpeta de resultados. |
 | `TEMP_DIRECTORY` | ruta | `temp` | Carpeta temporal. |
 | `LOGS_DIRECTORY` | ruta | `logs` | Carpeta de logs. |
-| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red para `yt-dlp`. |
-| `MAX_VIDEO_MB` | entero | `200` | Límite de tamaño para archivos locales. |
+| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red para `yt-dlp` **y** para las llamadas al proveedor de IA. |
+| `MAX_VIDEO_MB` | entero | `200` | Límite de tamaño para archivos locales **y** para el audio descargado de TikTok. |
 | `ALLOW_MOCK_FALLBACK` | `true`/`false` | `false` | Si el proveedor elegido no tiene clave, usar `mock` en vez de fallar. |
 | `KEEP_TEMP_ON_ERROR` | `true`/`false` | `true` | Conservar la carpeta temporal cuando un procesamiento falla (debug). |
 
@@ -192,7 +197,7 @@ Formatos aceptados: `mp4, mov, mkv, webm, avi, m4v, flv` (y audio suelto:
 | `--ai-model NOMBRE` | Fuerza el modelo del proveedor de IA (ignora `AI_MODEL`). |
 | `--model small\|medium\|…` | Fuerza el modelo de Whisper. |
 | `--no-pdf` | Genera solo el `.txt`. |
-| `--keep-temp` | No borra la carpeta temporal. |
+| `--keep-temp` | Conserva la carpeta temporal aunque el procesamiento termine bien (por defecto se borra en éxito). |
 | `--config` | Muestra la configuración y sale. |
 
 Progreso mostrado:
@@ -249,6 +254,94 @@ modelos con el tiempo; si uno deja de funcionar, pon el nombre nuevo en
 Si el análisis con IA falla (límite de cuota, modelo caído, red), el `.txt` con
 la transcripción se genera igualmente y el `.pdf` sale en modo degradado dejando
 constancia del motivo, en vez de abortar todo el procesamiento.
+
+---
+
+## Arquitectura del sistema
+
+El proyecto es un **pipeline lineal desacoplado**: cada etapa es un módulo
+independiente que recibe y devuelve `dataclasses` simples, sin estado global.
+Cambiar de proveedor de IA no requiere tocar el resto del programa (patrón
+*Strategy* en `src/ai_providers/`).
+
+```mermaid
+flowchart LR
+    subgraph CLI["🖥️ Entrada"]
+        M["main.py<br/><sub>argparse + menú</sub>"]
+        CFG["config.py<br/><sub>.env → Config</sub>"]
+    end
+
+    subgraph PIPE["⚙️ src/pipeline.py — orquestador"]
+        direction TB
+        S1["tiktok_downloader /<br/>local_video"]
+        S2["audio_extractor<br/><sub>FFmpeg</sub>"]
+        S3["transcriber<br/><sub>Whisper</sub>"]
+        S4["language_detector"]
+        S5["translator"]
+        S6["ai_analyzer"]
+        S7["txt_writer /<br/>pdf_generator"]
+        S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+    end
+
+    subgraph AI["🧩 src/ai_providers/ (Strategy)"]
+        BASE["base.py<br/><sub>AIProvider (ABC)<br/>reintentos + backoff</sub>"]
+        GEM["gemini_provider.py<br/><sub>✅ en uso — capa gratuita</sub>"]
+        OAI["openai_provider.py"]
+        DS["deepseek_provider.py"]
+        MOCK["mock_provider.py<br/><sub>offline, para tests</sub>"]
+        BASE -.-> GEM
+        BASE -.-> OAI
+        BASE -.-> DS
+        BASE -.-> MOCK
+    end
+
+    UTILS["🛡️ utils.py<br/><sub>logging seguro · rutas seguras<br/>temp workspace · JSON tolerante</sub>"]
+
+    M --> CFG --> PIPE
+    S5 -.usa.-> AI
+    S6 -.usa.-> AI
+    PIPE -.-> UTILS
+
+    classDef entrada fill:#f4f6fb,stroke:#4285F4,color:#1a1a1a
+    classDef ia fill:#8A2BE2,stroke:#5b1a99,color:#fff
+    classDef activo fill:#34A853,stroke:#1e7a34,color:#fff
+    classDef util fill:#fff3cd,stroke:#b38600,color:#1a1a1a
+    class M,CFG entrada
+    class BASE,OAI,DS,MOCK ia
+    class GEM activo
+    class UTILS util
+```
+
+| Capa | Módulos | Responsabilidad |
+|---|---|---|
+| **Entrada** | `main.py`, `config.py` | CLI, menú interactivo, carga/validación de `.env`. |
+| **Orquestador** | `src/pipeline.py` | Encadena las 6 etapas y decide si continuar en modo degradado ante un fallo de IA. |
+| **Proveedores de IA** | `src/ai_providers/` | Interfaz común `AIProvider`; cada proveedor solo implementa `_complete_raw()`. Reintentos/backoff centralizados en la clase base. |
+| **Transversal** | `src/utils.py` | Logging con redacción de secretos, rutas seguras (anti *path traversal*), carpeta temporal, parseo de JSON tolerante. |
+
+📄 Detalle completo de cada etapa, el modelo de datos y las decisiones de
+diseño: [**INFORME_TECNICO.md**](INFORME_TECNICO.md).
+
+---
+
+## Seguridad
+
+El proyecto procesa contenido de terceros desconocidos (vídeos públicos) y
+usa una API de IA externa, así que se tomaron medidas concretas en ambos
+frentes:
+
+| Medida | Dónde | Por qué |
+|---|---|---|
+| 🔑 **Redacción de secretos en logs** | `utils.py::SecretFilter` | Las claves (`sk-…`, `AIza…`, `Bearer …`) se sustituyen por `[REDACTED]` en consola y archivo de log; `--config` solo muestra la clave enmascarada (`AIza…3456`). |
+| 🧱 **Anti *path traversal*** | `utils.py::safe_output_path` | Los nombres de archivo derivados de datos externos (título del vídeo, id) nunca pueden escribir fuera de `output/`. |
+| 🎯 **Solo contenido público** | `tiktok_downloader.py` | `yt-dlp` se usa sin cookies ni credenciales; nunca se intenta sortear un vídeo privado o con captcha. |
+| 📦 **Límite de tamaño de descarga** | `tiktok_downloader.py` / `local_video.py` | `MAX_VIDEO_MB` limita tanto los archivos locales como el audio descargado de TikTok (`max_filesize` de yt-dlp), evitando descargas desproporcionadas. |
+| ⏱️ **Timeout de red en la IA** | `ai_providers/gemini_provider.py` | Las llamadas a Gemini usan `NETWORK_TIMEOUT` del `.env`; sin esto, una llamada colgada bloquearía el pipeline indefinidamente. |
+| 🛑 **Guardas contra inyección de instrucciones** | `translator.py`, `ai_analyzer.py` | La transcripción es contenido de un tercero no confiable. Los *system prompts* indican explícitamente al modelo que ese texto es **dato a procesar, nunca una instrucción**, aunque contenga frases como "ignora tus reglas". |
+| 🗑️ **Sin persistencia del vídeo** | `tiktok_downloader.py`, `TempWorkspace` | Solo se guarda el audio, en una carpeta temporal por trabajo que se borra al terminar con éxito. |
+| 🙈 **`.env` fuera del repositorio** | `.gitignore` | Las claves de API, `logs/`, `temp/` y `output/` nunca se suben a Git. |
+
+Más contexto en la [sección 8 del informe técnico](INFORME_TECNICO.md#8-seguridad-y-privacidad).
 
 ---
 
@@ -342,7 +435,8 @@ pytest -q
 ```
 
 Los tests usan mocks: **no** hacen descargas reales de TikTok ni llamadas reales
-a APIs, y no necesitan PyTorch.
+a APIs, y no necesitan PyTorch. Incluyen la clasificación de errores y el
+autocambio de modelo del proveedor Gemini.
 
 ---
 

@@ -355,6 +355,9 @@ la librería no está). Toda la configuración vive en la `dataclass` **`Config`
 | **Claves nunca en pantalla** | `Config.masked_keys()` en `--config` y en el menú. |
 | **Anti *path traversal*** | `src/utils.py::safe_output_path` resuelve la ruta y verifica que queda dentro del directorio base; `sanitize_filename` elimina separadores, `..` y caracteres no ASCII simples. |
 | **`.env` fuera del repo** | `.gitignore` excluye `.env` y `.env.*` (permitiendo `.env.example`); `*.log`, `logs/`, `output/txt/`, `output/pdf/`, `temp/`, `.venv/` también quedan fuera. |
+| **Límite de tamaño de descarga** | `MAX_VIDEO_MB` se aplica tanto a `--file` (`local_video.py`) como al audio de TikTok, vía `max_filesize` de `yt-dlp` (`tiktok_downloader.py`). Evita gastar ancho de banda/disco (y cuota de IA) con un vídeo desproporcionado. |
+| **Timeout de red en la IA** | `GeminiProvider` recibe `NETWORK_TIMEOUT` y lo pasa como `http_options.timeout` al SDK; sin esto, una llamada colgada bloqueaba el pipeline indefinidamente (el SDK no tiene timeout propio). |
+| **Guardas contra inyección de instrucciones** | La transcripción es contenido de un tercero no confiable. Los *system prompts* de `translator.py` y `ai_analyzer.py` indican explícitamente al modelo que ese texto es **dato**, nunca una instrucción, y que debe ignorar cualquier orden incluida dentro de la transcripción. |
 | **Aviso legal** | El README documenta el uso responsable (contenido público, Términos de Servicio de TikTok, propiedad intelectual). |
 
 ---
@@ -417,16 +420,20 @@ la librería no está). Toda la configuración vive en la `dataclass` **`Config`
 
 ## 12. Pruebas e integración continua
 
-- **86 tests** con `pytest`, en `tests/`. Usan `MockProvider` y `monkeypatch`: **no** hacen
-  descargas reales de TikTok ni llamadas reales a APIs, y **no** requieren PyTorch.
+- **106 tests** con `pytest`, en `tests/`. Usan `MockProvider`, dobles del SDK de Gemini y
+  `monkeypatch`: **no** hacen descargas reales de TikTok ni llamadas reales a APIs, y **no**
+  requieren PyTorch.
 
 | Archivo | Cubre |
 |---|---|
 | `test_url_validation.py` | `validate_url` / `is_tiktok_url`: válidas, inválidas, no-TikTok, enlaces `vm./vt.`, dominios parecidos rechazados. |
 | `test_utils_filenames.py` | `sanitize_filename`, `safe_output_path` (anti *path traversal*), `extract_video_id`, `format_timestamp`. |
+| `test_temp_workspace.py` | `TempWorkspace`: se borra en éxito, se conserva con `always_keep`/`keep_on_error`. |
+| `test_tiktok_max_filesize.py` | `MAX_VIDEO_MB` se traduce en `max_filesize` para `yt-dlp`. |
 | `test_config.py` | Parseo de `.env`, defaults, validación, creación de carpetas, enmascarado de claves, `resolved_provider()` con/sin *fallback*. |
 | `test_language_detector.py` | Detección es/en, nombres de idioma, "Whisper gana" ante discrepancia. |
-| `test_translator.py` | Español → no traduce; inglés → traduce conservando nº de segmentos y timestamps; términos técnicos intactos; lotes grandes. |
+| `test_translator.py` | Español → no traduce; inglés → traduce conservando nº de segmentos y timestamps; términos técnicos intactos; lotes grandes; fallo persistente se contabiliza (no se silencia). |
+| `test_gemini_provider.py` | Clasificación de errores del SDK (auth/rate-limit/genérico), auth no reintenta, autocambio de modelo retirado (incluido el caso sin bucle), timeout de construcción. |
 | `test_txt_writer.py` | Cabeceras exactas, líneas `[MM:SS]`, una o dos secciones según haya traducción. |
 | `test_ai_parser.py` | `extract_json` (limpio, entre ```` ``` ````, con ruido, anidado, truncado); `_coerce_report`; `analyze_content` (JSON válido, reintento, doble fallo → reserva, error de proveedor → degradado, `AIAuthError` → propaga). |
 | `test_pdf_generator.py` | Genera PDF real en carpeta temporal: empieza por `%PDF`, > 2 KB, acentos, informe vacío, tecnologías como lista de cadenas. |
