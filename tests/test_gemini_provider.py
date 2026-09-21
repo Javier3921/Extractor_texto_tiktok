@@ -157,6 +157,68 @@ class TestSobrecargaTransitoria:
             p.complete("sys", "user")
 
 
+class TestFallbackDeModeloPorSobrecarga:
+    def test_cae_al_modelo_de_reserva_tras_agotar_reintentos(self, monkeypatch):
+        import time as time_module
+        monkeypatch.setattr(time_module, "sleep", lambda _s: None)
+        p = _provider(fallback_model="gemini-flash-lite-latest")
+        p.max_retries = 1  # que el modelo principal falle rapido, sin reintentos
+
+        def fake_generate(*, model, contents, config):
+            if model == "gemini-3.6-flash":
+                raise _FakeAPIError("UNAVAILABLE", code=503)
+            return _FakeResponse("ok desde reserva")
+
+        monkeypatch.setattr(p._client.models, "generate_content", fake_generate)
+        result = p.complete("sys", "user")
+        assert result == "ok desde reserva"
+        assert p.model == "gemini-flash-lite-latest"
+
+    def test_sin_fallback_configurado_propaga_overloaded(self, monkeypatch):
+        import time as time_module
+        monkeypatch.setattr(time_module, "sleep", lambda _s: None)
+        p = _provider(fallback_model="")
+        p.max_retries = 1
+
+        def boom(**_kw):
+            raise _FakeAPIError("UNAVAILABLE", code=503)
+
+        monkeypatch.setattr(p._client.models, "generate_content", boom)
+        with pytest.raises(AIOverloadedError):
+            p.complete("sys", "user")
+        assert p.model == "gemini-3.6-flash"  # no cambio de modelo
+
+    def test_fallback_tambien_sobrecargado_propaga_overloaded(self, monkeypatch):
+        import time as time_module
+        monkeypatch.setattr(time_module, "sleep", lambda _s: None)
+        p = _provider(fallback_model="gemini-flash-lite-latest")
+        p.max_retries = 1
+
+        def boom(**_kw):
+            raise _FakeAPIError("UNAVAILABLE", code=503)
+
+        monkeypatch.setattr(p._client.models, "generate_content", boom)
+        with pytest.raises(AIOverloadedError):
+            p.complete("sys", "user")
+        assert p.model == "gemini-flash-lite-latest"  # ya cambio, aunque tambien fallo
+
+    def test_fallback_igual_al_modelo_principal_no_hace_nada(self, monkeypatch):
+        import time as time_module
+        monkeypatch.setattr(time_module, "sleep", lambda _s: None)
+        p = _provider(fallback_model="gemini-3.6-flash")  # mismo modelo
+        p.max_retries = 1
+        calls = {"n": 0}
+
+        def boom(**_kw):
+            calls["n"] += 1
+            raise _FakeAPIError("UNAVAILABLE", code=503)
+
+        monkeypatch.setattr(p._client.models, "generate_content", boom)
+        with pytest.raises(AIOverloadedError):
+            p.complete("sys", "user")
+        assert calls["n"] == 1  # no se reintento con un "fallback" identico
+
+
 class TestAutocambioDeModelo:
     def test_modelo_retirado_cambia_al_sustituto(self, monkeypatch):
         p = _provider()

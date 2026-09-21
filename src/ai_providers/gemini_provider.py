@@ -23,7 +23,8 @@ _MODEL_MOVED = re.compile(r"use\s+models/([A-Za-z0-9.\-]+)", re.IGNORECASE)
 class GeminiProvider(AIProvider):
     name = "gemini"
 
-    def __init__(self, api_key: str, model: str, timeout: float | None = None):
+    def __init__(self, api_key: str, model: str, timeout: float | None = None,
+                fallback_model: str = ""):
         super().__init__(api_key, model)
         if not api_key:
             raise AIAuthError(
@@ -42,6 +43,24 @@ class GeminiProvider(AIProvider):
         # (el SDK no tiene timeout por defecto): usamos NETWORK_TIMEOUT del .env.
         http_options = types.HttpOptions(timeout=int(timeout * 1000)) if timeout else None
         self._client = genai.Client(api_key=api_key, http_options=http_options)
+        # Modelo de reserva si el elegido esta sobrecargado (503) y se agotan los
+        # reintentos: normalmente un modelo mas ligero tiene mas margen libre.
+        self._fallback_model = (fallback_model or "").strip()
+
+    def complete(self, system: str, user: str, *, want_json: bool = False,
+                max_tokens: int = 4096) -> str:
+        try:
+            return super().complete(system, user, want_json=want_json, max_tokens=max_tokens)
+        except AIOverloadedError:
+            if not self._fallback_model or self._fallback_model == self.model:
+                raise
+            log.warning(
+                "%s: el modelo '%s' sigue sobrecargado tras los reintentos; "
+                "se prueba una vez con el modelo de reserva '%s'.",
+                self.name, self.model, self._fallback_model,
+            )
+            self.model = self._fallback_model
+            return super().complete(system, user, want_json=want_json, max_tokens=max_tokens)
 
     def _complete_raw(self, system: str, user: str, want_json: bool, max_tokens: int,
                       _allow_model_switch: bool = True) -> str:

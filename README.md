@@ -126,6 +126,7 @@ Edita `.env` y rellena la clave del proveedor que vayas a usar (ver abajo).
 |---|---|---|---|
 | `AI_PROVIDER` | `openai` `gemini` `deepseek` `mock` | `gemini` | Proveedor para traducción y análisis. |
 | `AI_MODEL` | texto | *(vacío)* | Modelo concreto. Vacío = modelo por defecto del proveedor. |
+| `GEMINI_FALLBACK_MODEL` | texto | `gemini-flash-lite-latest` | Solo Gemini: si el modelo principal se sobrecarga (503) y se agotan los reintentos, se prueba una vez con este antes de degradar el informe. Vacío = desactivado. |
 | `OPENAI_API_KEY` | texto | — | Clave de OpenAI. |
 | `GEMINI_API_KEY` | texto | — | Clave de Google AI Studio (gratuita). |
 | `DEEPSEEK_API_KEY` | texto | — | Clave de DeepSeek. |
@@ -492,7 +493,7 @@ pero es de pago y limita a 25 MB por archivo de audio.
 | Descarga enorme al instalar | Es PyTorch (backend Whisper local). Alternativa: `TRANSCRIPTION_BACKEND=openai_api`. |
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |
 | `Falta la clave de API para gemini` | Rellena `GEMINI_API_KEY` en `.env` o usa `--provider mock`. |
-| PDF degradado con `error 503 UNAVAILABLE` / `high demand` | La capa gratuita de Gemini está saturada por demanda alta (temporal, no es un problema de configuración). El sistema ya reintenta automáticamente con espera creciente; si aun así falla, espera unos minutos y vuelve a procesar el mismo video (el `.txt` no se pierde). |
+| PDF degradado con `error 503 UNAVAILABLE` / `high demand` | La capa gratuita de Gemini está saturada por demanda alta (temporal, no es un problema de configuración). El sistema ya reintenta con espera creciente y, si el modelo principal sigue sobrecargado, cae automáticamente a `GEMINI_FALLBACK_MODEL` (por defecto `gemini-flash-lite-latest`, con más margen libre). Si aun así falla, espera unos minutos y reprocesa el mismo video (el `.txt` no se pierde). |
 | La 1.ª transcripción tarda | Descarga el modelo Whisper (`small` ≈ 490 MB). Solo la primera vez. |
 | El PDF sale con fuente distinta | Si no hay `C:\Windows\Fonts\arial.ttf`, usa Helvetica. El texto español se renderiza igual. |
 

@@ -49,10 +49,14 @@ def _get_int(name: str, default: int) -> int:
         return default
 
 
+DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-flash-lite-latest"
+
+
 @dataclass
 class Config:
     ai_provider: str = "gemini"
     ai_model: str = ""
+    gemini_fallback_model: str = DEFAULT_GEMINI_FALLBACK_MODEL
     openai_api_key: str = ""
     gemini_api_key: str = ""
     deepseek_api_key: str = ""
@@ -86,6 +90,7 @@ class Config:
         cfg = cls(
             ai_provider=_get("AI_PROVIDER", "gemini").lower(),
             ai_model=_get("AI_MODEL", ""),
+            gemini_fallback_model=_get("GEMINI_FALLBACK_MODEL", DEFAULT_GEMINI_FALLBACK_MODEL),
             openai_api_key=_get("OPENAI_API_KEY"),
             gemini_api_key=_get("GEMINI_API_KEY"),
             deepseek_api_key=_get("DEEPSEEK_API_KEY"),
@@ -175,6 +180,7 @@ class Config:
             f"Proveedor de IA .......... {self.ai_provider}"
             + ("" if self.has_key_for(self.ai_provider) else "  [SIN CLAVE]"),
             f"Modelo de IA ............. {self.effective_ai_model()}",
+            f"Modelo reserva (Gemini) .. {self.gemini_fallback_model or '(desactivado)'}",
             f"Backend transcripcion .... {self.transcription_backend}",
             f"Modelo Whisper ........... {self.transcription_model}",
             f"Carpeta de salida ........ {self.output_dir}",
