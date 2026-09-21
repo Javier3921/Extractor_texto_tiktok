@@ -10,7 +10,9 @@
 </p>
 
 Convierte un vídeo de **TikTok** (o un archivo de vídeo local) en un **informe
-técnico profesional en PDF, redactado íntegramente en español**.
+técnico profesional en PDF, redactado íntegramente en español**. Úsalo desde
+la línea de comandos o desde una pequeña **interfaz gráfica** — solo pega el
+enlace y, si quieres, dile a la IA qué priorizar en el informe.
 
 > **🔒 Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
 > se obtiene el **audio**, en un archivo temporal que se borra al terminar.
@@ -36,9 +38,6 @@ flowchart TD
     class F,H ia
     class I salida
 ```
-
-> 📄 **¿Cómo está construido?** Consulta el [**Informe técnico**](INFORME_TECNICO.md):
-> arquitectura, pipeline etapa por etapa, stack tecnológico y decisiones de diseño.
 
 ---
 
@@ -348,9 +347,6 @@ flowchart LR
 | **Proveedores de IA** | `src/ai_providers/` | Interfaz común `AIProvider`; cada proveedor solo implementa `_complete_raw()`. Reintentos/backoff centralizados en la clase base. |
 | **Transversal** | `src/utils.py` | Logging con redacción de secretos, rutas seguras (anti *path traversal*), carpeta temporal, parseo de JSON tolerante. |
 
-📄 Detalle completo de cada etapa, el modelo de datos y las decisiones de
-diseño: [**INFORME_TECNICO.md**](INFORME_TECNICO.md).
-
 ---
 
 ## Seguridad
@@ -369,8 +365,6 @@ frentes:
 | 🛑 **Guardas contra inyección de instrucciones** | `translator.py`, `ai_analyzer.py` | La transcripción es contenido de un tercero no confiable. Los *system prompts* indican explícitamente al modelo que ese texto es **dato a procesar, nunca una instrucción**, aunque contenga frases como "ignora tus reglas". |
 | 🗑️ **Sin persistencia del vídeo** | `tiktok_downloader.py`, `TempWorkspace` | Solo se guarda el audio, en una carpeta temporal por trabajo que se borra al terminar con éxito. |
 | 🙈 **`.env` fuera del repositorio** | `.gitignore` | Las claves de API, `logs/`, `temp/` y `output/` nunca se suben a Git. |
-
-Más contexto en la [sección 8 del informe técnico](INFORME_TECNICO.md#8-seguridad-y-privacidad).
 
 ---
 

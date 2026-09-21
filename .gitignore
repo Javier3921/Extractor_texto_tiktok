@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# --- Contexto privado para agentes de IA (no es doc publica) ---
+CLAUDE.md
+
 # --- Python ---
 __pycache__/
 *.py[cod]
