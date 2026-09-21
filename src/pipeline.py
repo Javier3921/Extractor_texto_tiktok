@@ -1,7 +1,7 @@
 """Orquestador del pipeline completo (6 etapas).
 
 URL/archivo -> audio -> Whisper -> transcripcion -> deteccion de idioma ->
-traduccion al espanol (si procede) -> TXT -> analisis IA -> PDF.
+traduccion al espanol (si procede) -> TXT -> analisis IA -> HTML.
 """
 from __future__ import annotations
 
@@ -13,10 +13,10 @@ from config import Config
 from src.ai_analyzer import analyze_content
 from src.ai_providers import get_provider
 from src.audio_extractor import extract_audio, probe_duration
+from src.html_generator import build_html
 from src.language_detector import detect_language
 from src.local_video import validate_local_media
 from src.models import ProcessingResult, Transcript
-from src.pdf_generator import build_pdf
 from src.tiktok_downloader import fetch_audio
 from src.transcriber import transcribe
 from src.translator import translate_to_spanish
@@ -41,20 +41,20 @@ def _ok(msg: str) -> None:
     print(f"[OK] {msg}")
 
 
-def process_url(url: str, cfg: Config, *, make_pdf: bool = True,
+def process_url(url: str, cfg: Config, *, make_html: bool = True,
                 user_instructions: str = "") -> ProcessingResult:
-    return _process(kind="url", ref=url, cfg=cfg, make_pdf=make_pdf,
+    return _process(kind="url", ref=url, cfg=cfg, make_html=make_html,
                     user_instructions=user_instructions)
 
 
-def process_file(path: str, cfg: Config, *, make_pdf: bool = True,
+def process_file(path: str, cfg: Config, *, make_html: bool = True,
                  user_instructions: str = "") -> ProcessingResult:
-    return _process(kind="file", ref=path, cfg=cfg, make_pdf=make_pdf,
+    return _process(kind="file", ref=path, cfg=cfg, make_html=make_html,
                     user_instructions=user_instructions)
 
 
 # --------------------------------------------------------------------------
-def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool,
+def _process(*, kind: str, ref: str, cfg: Config, make_html: bool,
             user_instructions: str = "") -> ProcessingResult:
     started = time.time()
     provider_name = cfg.resolved_provider()
@@ -146,7 +146,7 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool,
             result.translated = tr.translated
             if tr.failed_segments:
                 _info(f"[AVISO] {tr.failed_segments} segmento(s) no se pudieron traducir; "
-                      "se dejo el texto original (mezcla de idiomas posible en el TXT/PDF).")
+                      "se dejo el texto original (mezcla de idiomas posible en el TXT/HTML).")
 
             spanish_segments = tr.spanish_segments
             original_segments = transcript.segments
@@ -177,19 +177,19 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool,
                 user_instructions=user_instructions,
             )
 
-            # -- 6. PDF ---------------------------------------------
-            if make_pdf:
-                _step(6, "Generando PDF...")
-                pdf_path = build_pdf(
-                    report, pdf_dir=cfg.pdf_dir, video_id=vid,
+            # -- 6. HTML ---------------------------------------------
+            if make_html:
+                _step(6, "Generando informe HTML...")
+                html_path = build_html(
+                    report, html_dir=cfg.html_dir, video_id=vid,
                     url=url_for_report, original_language=language.name,
                     translated=tr.translated, provider=provider.name,
                     ai_model=cfg.effective_ai_model(),
                     duration_str=format_timestamp(transcript.duration),
                 )
-                result.pdf_path = str(pdf_path)
+                result.html_path = str(html_path)
             else:
-                _step(6, "PDF omitido (--no-pdf).")
+                _step(6, "Informe HTML omitido (--no-html).")
 
             result.ok = True
             ws.mark_ok()
@@ -213,9 +213,9 @@ def _print_summary(r: ProcessingResult) -> None:
         print()
         print("TXT:")
         print(f"  {r.txt_path}")
-        if r.pdf_path:
-            print("PDF:")
-            print(f"  {r.pdf_path}")
+        if r.html_path:
+            print("Informe HTML:")
+            print(f"  {r.html_path}")
     else:
         print(f"[ERROR] No se pudo completar el procesamiento de: {r.source_ref}")
         print(f"        {r.error}")

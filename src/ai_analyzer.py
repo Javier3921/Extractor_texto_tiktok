@@ -230,7 +230,7 @@ def _provider_error_report(reason: str, original_language: str, translated: bool
                            title: str) -> AnalysisReport:
     """Informe minimo cuando el proveedor de IA no responde (rate limit, modelo
     caido, red...). El TXT con la transcripcion ya se genero antes; aqui se
-    produce un PDF que deja constancia del fallo en vez de abortar todo."""
+    produce un HTML que deja constancia del fallo en vez de abortar todo."""
     nd = "No se pudo generar: el proveedor de IA no completo la peticion."
     return AnalysisReport(
         title=title or "Informe tecnico (analisis no disponible)",

@@ -2,7 +2,7 @@
 
 Pide la URL de un video de TikTok y, opcionalmente, indicaciones para la IA
 sobre que priorizar en el informe. Al terminar, muestra en un mensaje donde
-quedaron guardados el .txt y el .pdf (rutas y nombres de archivo).
+quedaron guardados el .txt y el informe .html (rutas y nombres de archivo).
 
 Uso:
     python main.py --gui
@@ -69,8 +69,8 @@ def run_gui(cfg: Config) -> None:
             lines = ["El informe se genero correctamente.\n"]
             if result.txt_path:
                 lines.append(f"Transcripcion (.txt):\n{result.txt_path}\n")
-            if result.pdf_path:
-                lines.append(f"Informe tecnico (.pdf):\n{result.pdf_path}")
+            if result.html_path:
+                lines.append(f"Informe tecnico (.html):\n{result.html_path}")
             messagebox.showinfo("Informe generado", "\n".join(lines))
         else:
             status_var.set("Fallo el procesamiento.")
@@ -79,7 +79,7 @@ def run_gui(cfg: Config) -> None:
     def worker(url: str, instructions: str) -> None:
         from src.pipeline import process_url
         try:
-            result = process_url(url, cfg, make_pdf=True, user_instructions=instructions)
+            result = process_url(url, cfg, make_html=True, user_instructions=instructions)
         except ExtractorError as e:
             root.after(0, finish_error, str(e))
             return

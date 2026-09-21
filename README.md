@@ -10,9 +10,10 @@
 </p>
 
 Convierte un vídeo de **TikTok** (o un archivo de vídeo local) en un **informe
-técnico profesional en PDF, redactado íntegramente en español**. Úsalo desde
-la línea de comandos o desde una pequeña **interfaz gráfica** — solo pega el
-enlace y, si quieres, dile a la IA qué priorizar en el informe.
+técnico profesional en HTML, redactado íntegramente en español**, con
+gráficos y una insignia de dificultad. Úsalo desde la línea de comandos o
+desde una pequeña **interfaz gráfica** — solo pega el enlace y, si quieres,
+dile a la IA qué priorizar en el informe.
 
 > **🔒 Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
 > se obtiene el **audio**, en un archivo temporal que se borra al terminar.
@@ -27,7 +28,7 @@ flowchart TD
     E -- "Inglés / otro" --> F["🌍 Traducir al español<br/><sub>IA · conserva el original</sub>"]
     F --> G
     G --> H["🧠 Analizar contenido<br/><sub>IA · anti-alucinación</sub>"]
-    H --> I(["📕 Informe .pdf<br/><sub>portada + 12 secciones</sub>"])
+    H --> I(["🌐 Informe .html<br/><sub>autónomo, con gráficos</sub>"])
 
     classDef entrada fill:#4285F4,stroke:#1a56c4,color:#fff
     classDef proceso fill:#f4f6fb,stroke:#4285F4,color:#1a1a1a
@@ -196,7 +197,7 @@ Formatos aceptados: `mp4, mov, mkv, webm, avi, m4v, flv` (y audio suelto:
 | `--provider gemini\|openai\|deepseek\|mock` | Fuerza el proveedor de IA (ignora `.env`). |
 | `--ai-model NOMBRE` | Fuerza el modelo del proveedor de IA (ignora `AI_MODEL`). |
 | `--model small\|medium\|…` | Fuerza el modelo de Whisper. |
-| `--no-pdf` | Genera solo el `.txt`. |
+| `--no-html` | Genera solo el `.txt`. |
 | `--keep-temp` | Conserva la carpeta temporal aunque el procesamiento termine bien (por defecto se borra en éxito). |
 | `--instructions "TEXTO"` | Indicaciones para la IA sobre qué priorizar o incluir en el informe (ver [más abajo](#instrucciones-personalizadas-para-la-ia)). |
 | `--config` | Muestra la configuración y sale. |
@@ -213,7 +214,7 @@ Progreso mostrado:
 [5/6] Traduciendo/analizando con IA...
 [INFO] Traduciendo contenido al español...
 [OK] Traducción completada.
-[6/6] Generando PDF...
+[6/6] Generando informe HTML...
 ```
 
 ### Interfaz gráfica
@@ -226,7 +227,7 @@ Abre una ventana (Tkinter, sin dependencias adicionales) con un campo para la
 **URL de TikTok** y un cuadro de texto para **indicaciones a la IA** sobre qué
 priorizar en el informe. El procesamiento corre en segundo plano (no se
 congela la ventana) y, al terminar, muestra un mensaje con **dónde quedaron
-guardados el `.txt` y el `.pdf`, y con qué nombres**.
+guardados el `.txt` y el `.html`, y con qué nombres**.
 
 ### Instrucciones personalizadas para la IA
 
@@ -281,7 +282,7 @@ modelos con el tiempo; si uno deja de funcionar, pon el nombre nuevo en
 **autocorregir** el modelo si la API indica el sustituto en el error.
 
 Si el análisis con IA falla (límite de cuota, modelo caído, red), el `.txt` con
-la transcripción se genera igualmente y el `.pdf` sale en modo degradado dejando
+la transcripción se genera igualmente y el `.html` sale en modo degradado dejando
 constancia del motivo, en vez de abortar todo el procesamiento.
 
 ---
@@ -308,7 +309,7 @@ flowchart LR
         S4["language_detector"]
         S5["translator"]
         S6["ai_analyzer"]
-        S7["txt_writer /<br/>pdf_generator"]
+        S7["txt_writer /<br/>html_generator"]
         S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
     end
 
@@ -374,9 +375,9 @@ frentes:
 ```
 output/
 ├── txt/
-│   └── tiktok_<id>.txt          (o  local_<nombre>_<fecha>.txt)
-└── pdf/
-    └── reporte_tiktok_<id>.pdf  (o  reporte_local_<nombre>_<fecha>.pdf)
+│   └── tiktok_<id>.txt           (o  local_<nombre>_<fecha>.txt)
+└── html/
+    └── reporte_tiktok_<id>.html  (o  reporte_local_<nombre>_<fecha>.html)
 ```
 
 ### `.txt`
@@ -407,14 +408,20 @@ TRANSCRIPCION EN ESPANOL
 (Si el vídeo ya está en español, solo aparece la sección **TRANSCRIPCION EN
 ESPANOL** con el texto original.)
 
-### `.pdf`
+### `.html`
 
-Portada + 12 secciones: **A** Resumen ejecutivo · **B** Explicación detallada ·
-**C** Tecnologías (tabla) · **D** Conceptos técnicos · **E** Arquitectura ·
-**F** Análisis de código · **G** Buenas prácticas · **H** Riesgos ·
-**I** Recomendaciones · **J** Nivel de dificultad · **K** Aplicaciones ·
-**L** Conclusión. Con numeración de páginas, encabezado y tipografía Unicode
-(acentos, `ñ`, `¿ ¡`, `ü`).
+Un único archivo **autónomo** (CSS y SVG inline, sin JavaScript, sin
+peticiones externas — se abre con doble clic en cualquier navegador, incluso
+sin internet) con 12 secciones: **A** Resumen ejecutivo · **B** Explicación
+detallada · **C** Tecnologías (tabla + **gráfico de barras** por categoría) ·
+**D** Conceptos técnicos · **E** Arquitectura · **F** Análisis de código ·
+**G** Buenas prácticas · **H** Riesgos · **I** Recomendaciones · **J** Nivel
+de dificultad (insignia con color) · **K** Aplicaciones · **L** Conclusión.
+
+Pesa una fracción de lo que pesaba el PDF anterior (unos ~8 KB para un
+informe típico, frente a ~100 KB) y admite imprimirse o "Guardar como PDF"
+desde el navegador si aún necesitas un archivo PDF puntual (incluye estilos
+de impresión).
 
 El análisis distingue explícitamente **información explícita**,
 **inferencia técnica** y **recomendación**, y evita inventar tecnologías,
@@ -443,11 +450,11 @@ Extractor_texto_tiktok/
 │   ├── translator.py       # traducción al español vía IA
 │   ├── ai_analyzer.py      # análisis técnico -> JSON -> AnalysisReport
 │   ├── txt_writer.py       # generación del .txt
-│   ├── pdf_generator.py    # generación del .pdf (ReportLab)
+│   ├── html_generator.py   # generación del .html (autónomo, sin dependencias)
 │   ├── utils.py            # logging seguro, rutas, JSON, FFmpeg, temp
 │   └── ai_providers/       # OpenAI / Gemini / DeepSeek / mock
 ├── input/urls.txt
-├── output/{txt,pdf}/
+├── output/{txt,html}/
 ├── temp/  · logs/
 └── tests/
 ```
@@ -493,9 +500,8 @@ pero es de pago y limita a 25 MB por archivo de audio.
 | Descarga enorme al instalar | Es PyTorch (backend Whisper local). Alternativa: `TRANSCRIPTION_BACKEND=openai_api`. |
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |
 | `Falta la clave de API para gemini` | Rellena `GEMINI_API_KEY` en `.env` o usa `--provider mock`. |
-| PDF degradado con `error 503 UNAVAILABLE` / `high demand` | La capa gratuita de Gemini está saturada por demanda alta (temporal, no es un problema de configuración). El sistema ya reintenta con espera creciente y, si el modelo principal sigue sobrecargado, cae automáticamente a `GEMINI_FALLBACK_MODEL` (por defecto `gemini-flash-lite-latest`, con más margen libre). Si aun así falla, espera unos minutos y reprocesa el mismo video (el `.txt` no se pierde). |
+| Informe degradado con `error 503 UNAVAILABLE` / `high demand` | La capa gratuita de Gemini está saturada por demanda alta (temporal, no es un problema de configuración). El sistema ya reintenta con espera creciente y, si el modelo principal sigue sobrecargado, cae automáticamente a `GEMINI_FALLBACK_MODEL` (por defecto `gemini-flash-lite-latest`, con más margen libre). Si aun así falla, espera unos minutos y reprocesa el mismo video (el `.txt` no se pierde). |
 | La 1.ª transcripción tarda | Descarga el modelo Whisper (`small` ≈ 490 MB). Solo la primera vez. |
-| El PDF sale con fuente distinta | Si no hay `C:\Windows\Fonts\arial.ttf`, usa Helvetica. El texto español se renderiza igual. |
 
 Los logs detallados están en `logs/run_AAAAMMDD.log`.
 

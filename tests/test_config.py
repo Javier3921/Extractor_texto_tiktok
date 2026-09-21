@@ -36,7 +36,7 @@ class TestDefaults:
     def test_dirs_created(self, clean_env, tmp_path):
         cfg = _load(tmp_path)
         assert cfg.txt_dir.exists()
-        assert cfg.pdf_dir.exists()
+        assert cfg.html_dir.exists()
         assert cfg.temp_dir.exists()
         assert cfg.logs_dir.exists()
 

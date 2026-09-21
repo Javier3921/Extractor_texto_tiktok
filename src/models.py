@@ -104,7 +104,7 @@ class ProcessingResult:
     original_language: str = ""
     translated: bool = False
     txt_path: Optional[str] = None
-    pdf_path: Optional[str] = None
+    html_path: Optional[str] = None
     duration: float = 0.0
     provider: str = ""
     ai_model: str = ""

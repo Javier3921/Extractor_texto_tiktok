@@ -27,8 +27,8 @@ openai>=1.40.0
 #   Gemini: SDK unificado nuevo (google-generativeai quedo deprecado).
 google-genai>=0.3.0
 
-# --- Generacion de PDF -------------------------------------------------
-reportlab>=4.1.0
+# --- Generacion del informe (HTML autonomo, sin dependencias) -----------
+# (nada que instalar: src/html_generator.py solo usa la libreria estandar)
 
 # --- Configuracion .env -----------------------------------------------
 python-dotenv>=1.0.1

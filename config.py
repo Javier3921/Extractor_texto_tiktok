@@ -127,7 +127,7 @@ class Config:
             )
 
     def ensure_dirs(self) -> None:
-        for d in (self.output_dir, self.output_dir / "txt", self.output_dir / "pdf",
+        for d in (self.output_dir, self.output_dir / "txt", self.output_dir / "html",
                   self.temp_dir, self.logs_dir, self.input_dir):
             Path(d).mkdir(parents=True, exist_ok=True)
 
@@ -137,8 +137,8 @@ class Config:
         return self.output_dir / "txt"
 
     @property
-    def pdf_dir(self) -> Path:
-        return self.output_dir / "pdf"
+    def html_dir(self) -> Path:
+        return self.output_dir / "html"
 
     def effective_ai_model(self) -> str:
         return self.ai_model or DEFAULT_AI_MODELS.get(self.ai_provider, "")

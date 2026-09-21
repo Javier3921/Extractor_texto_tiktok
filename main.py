@@ -34,7 +34,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="Extractor_texto_tiktok",
         description="TikTok/video -> transcripcion -> traduccion ES -> TXT -> "
-                    "analisis IA -> PDF tecnico.",
+                    "analisis IA -> informe HTML.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     src = p.add_mutually_exclusive_group()
@@ -48,7 +48,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
                    help="Modelo concreto del proveedor de IA (sobrescribe AI_MODEL)")
     p.add_argument("--model", choices=VALID_WHISPER_MODELS,
                    help="Modelo de Whisper (sobrescribe .env)")
-    p.add_argument("--no-pdf", action="store_true", help="No generar el PDF")
+    p.add_argument("--no-html", action="store_true", help="No generar el informe HTML")
     p.add_argument("--keep-temp", action="store_true",
                    help="Conservar la carpeta temporal aunque todo vaya bien")
     p.add_argument("--instructions", metavar="TEXTO", default="",
@@ -94,7 +94,7 @@ def show_config(cfg: Config) -> None:
 
 
 # --------------------------------------------------------------------------
-def run_batch(urls: list[str], cfg: Config, make_pdf: bool, *,
+def run_batch(urls: list[str], cfg: Config, make_html: bool, *,
              user_instructions: str = "") -> int:
     from src.pipeline import process_url
     if not urls:
@@ -106,7 +106,7 @@ def run_batch(urls: list[str], cfg: Config, make_pdf: bool, *,
         print("=" * 60)
         print(f"  ({i}/{len(urls)})  {url}")
         print("=" * 60)
-        results.append(process_url(url, cfg, make_pdf=make_pdf,
+        results.append(process_url(url, cfg, make_html=make_html,
                                    user_instructions=user_instructions))
 
     ok = sum(1 for r in results if r.ok)
@@ -153,7 +153,7 @@ def interactive_menu(cfg: Config) -> int:
             ).strip()
             try:
                 urls = read_urls_file(_resolve(path))
-                run_batch(urls, cfg, make_pdf=True, user_instructions=instructions)
+                run_batch(urls, cfg, make_html=True, user_instructions=instructions)
             except ExtractorError as e:
                 print(f"  [ERROR] {e}")
         elif choice == "3":
@@ -219,21 +219,21 @@ def main(argv: list[str] | None = None) -> int:
         run_gui(cfg)
         return 0
 
-    make_pdf = not args.no_pdf
+    make_html = not args.no_html
     instructions = args.instructions
 
     try:
         if args.url:
             from src.pipeline import process_url
-            r = process_url(args.url, cfg, make_pdf=make_pdf, user_instructions=instructions)
+            r = process_url(args.url, cfg, make_html=make_html, user_instructions=instructions)
             return 0 if r.ok else 2
         if args.file:
             from src.pipeline import process_file
-            r = process_file(args.file, cfg, make_pdf=make_pdf, user_instructions=instructions)
+            r = process_file(args.file, cfg, make_html=make_html, user_instructions=instructions)
             return 0 if r.ok else 2
         if args.urls_file is not None:
             urls = read_urls_file(_resolve(args.urls_file))
-            return run_batch(urls, cfg, make_pdf=make_pdf, user_instructions=instructions)
+            return run_batch(urls, cfg, make_html=make_html, user_instructions=instructions)
         return interactive_menu(cfg)
     except KeyboardInterrupt:
         print("\n[INTERRUMPIDO] Cancelado por el usuario.")

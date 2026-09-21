@@ -22,6 +22,7 @@ temp/
 logs/
 *.log
 output/txt/
+output/html/
 output/pdf/
 
 # --- Medios de prueba ---
