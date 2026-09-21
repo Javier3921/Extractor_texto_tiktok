@@ -128,6 +128,40 @@ class _RaisingProvider(AIProvider):
         raise self._exc
 
 
+class _CapturingProvider(AIProvider):
+    name = "capturing"
+
+    def __init__(self, response: str):
+        super().__init__("k", "m")
+        self._response = response
+        self.last_user_prompt = ""
+
+    def _complete_raw(self, system, user, want_json, max_tokens):
+        self.last_user_prompt = user
+        return self._response
+
+
+class TestUserInstructions:
+    def test_instructions_included_in_prompt(self, sample_report_dict):
+        prov = _CapturingProvider(json.dumps(sample_report_dict))
+        analyze_content(
+            spanish_text="contenido", original_text=None, translated=False,
+            original_language="Espanol", title="T", url="u", duration_str="00:30",
+            provider=prov, user_instructions="Enfocate en los riesgos de seguridad.",
+        )
+        assert "INSTRUCCIONES DEL USUARIO" in prov.last_user_prompt
+        assert "Enfocate en los riesgos de seguridad." in prov.last_user_prompt
+
+    def test_no_instructions_section_when_empty(self, sample_report_dict):
+        prov = _CapturingProvider(json.dumps(sample_report_dict))
+        analyze_content(
+            spanish_text="contenido", original_text=None, translated=False,
+            original_language="Espanol", title="T", url="u", duration_str="00:30",
+            provider=prov,
+        )
+        assert "INSTRUCCIONES DEL USUARIO" not in prov.last_user_prompt
+
+
 class TestAnalyzeContentProviderErrors:
     def test_provider_error_returns_degraded_report_not_exception(self):
         from src.ai_providers.base import AIProviderError

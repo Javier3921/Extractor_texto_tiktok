@@ -88,6 +88,10 @@ Componentes transversales:
 - **`src/utils.py`** — logging con redacción de secretos, rutas seguras, resolución de FFmpeg,
   parseo tolerante de JSON, gestión del espacio de trabajo temporal.
 - **`main.py`** — CLI (`argparse`) + menú interactivo + modo lote.
+- **`gui.py`** — interfaz gráfica mínima (Tkinter, sin dependencias nuevas): pide la URL y unas
+  indicaciones opcionales para la IA, corre el pipeline en un hilo aparte para no congelar la
+  ventana, y muestra al terminar dónde quedaron guardados el `.txt`/`.pdf`. Se invoca con
+  `python main.py --gui` y reutiliza `src/pipeline.py::process_url` sin duplicar lógica.
 
 ---
 
@@ -186,7 +190,10 @@ Produce un `LanguageInfo` con `code`, `name` (nombre legible desde una tabla ISO
 
 `src/ai_analyzer.py::analyze_content`. Entrada: la transcripción **en español** (contenido
 principal); si hubo traducción, se adjunta también la original *solo* para que el modelo
-verifique la terminología técnica.
+verifique la terminología técnica. Acepta además un parámetro opcional `user_instructions`
+(desde `--instructions`, el menú interactivo o la GUI) que se añade al prompt en una sección
+propia ("INSTRUCCIONES DEL USUARIO"): guía qué priorizar/ampliar dentro del mismo esquema JSON,
+pero el *system prompt* deja explícito que no autoriza a inventar datos ni a cambiar el formato.
 
 **Reglas anti-alucinación** codificadas en el *system prompt*:
 
@@ -420,7 +427,7 @@ la librería no está). Toda la configuración vive en la `dataclass` **`Config`
 
 ## 12. Pruebas e integración continua
 
-- **106 tests** con `pytest`, en `tests/`. Usan `MockProvider`, dobles del SDK de Gemini y
+- **108 tests** con `pytest`, en `tests/`. Usan `MockProvider`, dobles del SDK de Gemini y
   `monkeypatch`: **no** hacen descargas reales de TikTok ni llamadas reales a APIs, y **no**
   requieren PyTorch.
 
@@ -435,7 +442,7 @@ la librería no está). Toda la configuración vive en la `dataclass` **`Config`
 | `test_translator.py` | Español → no traduce; inglés → traduce conservando nº de segmentos y timestamps; términos técnicos intactos; lotes grandes; fallo persistente se contabiliza (no se silencia). |
 | `test_gemini_provider.py` | Clasificación de errores del SDK (auth/rate-limit/genérico), auth no reintenta, autocambio de modelo retirado (incluido el caso sin bucle), timeout de construcción. |
 | `test_txt_writer.py` | Cabeceras exactas, líneas `[MM:SS]`, una o dos secciones según haya traducción. |
-| `test_ai_parser.py` | `extract_json` (limpio, entre ```` ``` ````, con ruido, anidado, truncado); `_coerce_report`; `analyze_content` (JSON válido, reintento, doble fallo → reserva, error de proveedor → degradado, `AIAuthError` → propaga). |
+| `test_ai_parser.py` | `extract_json` (limpio, entre ```` ``` ````, con ruido, anidado, truncado); `_coerce_report`; `analyze_content` (JSON válido, reintento, doble fallo → reserva, error de proveedor → degradado, `AIAuthError` → propaga); `user_instructions` se incluye/omite en el prompt según corresponda. |
 | `test_pdf_generator.py` | Genera PDF real en carpeta temporal: empieza por `%PDF`, > 2 KB, acentos, informe vacío, tecnologías como lista de cadenas. |
 
 - **CI**: `.github/workflows/tests.yml` — en cada `push` y `pull_request`, sobre
@@ -479,6 +486,7 @@ la librería no está). Toda la configuración vive en la `dataclass` **`Config`
 ```
 Extractor_texto_tiktok/
 ├── main.py                    # CLI (argparse) + menú interactivo + modo lote
+├── gui.py                    # interfaz gráfica (Tkinter), --gui
 ├── config.py                  # dataclass Config: carga y validación de .env
 ├── requirements.txt
 ├── .env.example               # plantilla de configuración (sin claves)

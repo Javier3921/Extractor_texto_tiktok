@@ -6,6 +6,10 @@
 
 # --- Descarga de video (TikTok y otros) -----------------------------------
 yt-dlp>=2024.8.6
+# curl_cffi: necesario para la "impersonation" TLS que TikTok exige desde
+# 2026 para no bloquear la peticion como bot (sin esto: "Unexpected response
+# from webpage request").
+curl_cffi>=0.7.1
 
 # --- FFmpeg embebido (fallback si no hay FFmpeg del sistema) --------------
 imageio-ffmpeg>=0.5.1

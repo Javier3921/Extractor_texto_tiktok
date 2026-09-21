@@ -198,7 +198,9 @@ Formatos aceptados: `mp4, mov, mkv, webm, avi, m4v, flv` (y audio suelto:
 | `--model small\|medium\|…` | Fuerza el modelo de Whisper. |
 | `--no-pdf` | Genera solo el `.txt`. |
 | `--keep-temp` | Conserva la carpeta temporal aunque el procesamiento termine bien (por defecto se borra en éxito). |
+| `--instructions "TEXTO"` | Indicaciones para la IA sobre qué priorizar o incluir en el informe (ver [más abajo](#instrucciones-personalizadas-para-la-ia)). |
 | `--config` | Muestra la configuración y sale. |
+| `--gui` | Abre la interfaz gráfica (Tkinter) en vez de la CLI. |
 
 Progreso mostrado:
 
@@ -213,6 +215,33 @@ Progreso mostrado:
 [OK] Traducción completada.
 [6/6] Generando PDF...
 ```
+
+### Interfaz gráfica
+
+```bat
+python main.py --gui
+```
+
+Abre una ventana (Tkinter, sin dependencias adicionales) con un campo para la
+**URL de TikTok** y un cuadro de texto para **indicaciones a la IA** sobre qué
+priorizar en el informe. El procesamiento corre en segundo plano (no se
+congela la ventana) y, al terminar, muestra un mensaje con **dónde quedaron
+guardados el `.txt` y el `.pdf`, y con qué nombres**.
+
+### Instrucciones personalizadas para la IA
+
+Tanto en la CLI (`--instructions "TEXTO"`), el menú interactivo como la GUI
+puedes indicarle al análisis técnico qué enfatizar, por ejemplo:
+
+```bat
+python main.py --url "https://www.tiktok.com/@u/video/123" ^
+  --instructions "Enfocate en los riesgos de seguridad y compara con buenas practicas de OWASP"
+```
+
+Estas indicaciones **guían el énfasis** del informe (qué ampliar, resumir o
+destacar dentro de las mismas 12 secciones), pero no le dan permiso a la IA
+para inventar información que no esté en la transcripción ni para cambiar el
+formato de salida.
 
 ---
 
@@ -403,6 +432,7 @@ arquitecturas o código que no estén en el contenido.
 ```
 Extractor_texto_tiktok/
 ├── main.py                 # CLI + menú interactivo
+├── gui.py                  # interfaz gráfica (Tkinter), --gui
 ├── config.py               # carga y validación de .env
 ├── requirements.txt
 ├── .env.example
@@ -463,6 +493,7 @@ pero es de pago y limita a 25 MB por archivo de audio.
 |---|---|
 | `FFmpeg no esta disponible` | Instala `imageio-ffmpeg` (`pip install -r requirements.txt`) o FFmpeg del sistema (`winget install Gyan.FFmpeg`). |
 | `TikTok ha bloqueado o limitado la peticion` | Actualiza yt-dlp (`pip install -U yt-dlp`), espera un rato, o usa `--file` con el vídeo descargado a mano. |
+| `Unexpected response from webpage request` (con el aviso `attempting impersonation, but no impersonate target is available`) | Falta `curl_cffi`, necesario para que yt-dlp imite el TLS de un navegador (TikTok bloquea peticiones sin esto). Instálalo con `pip install -U curl_cffi` (ya está en `requirements.txt`). |
 | `El video es privado, restringido…` | El contenido no es público. La aplicación no accede a contenido no público. |
 | Descarga enorme al instalar | Es PyTorch (backend Whisper local). Alternativa: `TRANSCRIPTION_BACKEND=openai_api`. |
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |

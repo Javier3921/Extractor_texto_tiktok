@@ -41,16 +41,21 @@ def _ok(msg: str) -> None:
     print(f"[OK] {msg}")
 
 
-def process_url(url: str, cfg: Config, *, make_pdf: bool = True) -> ProcessingResult:
-    return _process(kind="url", ref=url, cfg=cfg, make_pdf=make_pdf)
+def process_url(url: str, cfg: Config, *, make_pdf: bool = True,
+                user_instructions: str = "") -> ProcessingResult:
+    return _process(kind="url", ref=url, cfg=cfg, make_pdf=make_pdf,
+                    user_instructions=user_instructions)
 
 
-def process_file(path: str, cfg: Config, *, make_pdf: bool = True) -> ProcessingResult:
-    return _process(kind="file", ref=path, cfg=cfg, make_pdf=make_pdf)
+def process_file(path: str, cfg: Config, *, make_pdf: bool = True,
+                 user_instructions: str = "") -> ProcessingResult:
+    return _process(kind="file", ref=path, cfg=cfg, make_pdf=make_pdf,
+                    user_instructions=user_instructions)
 
 
 # --------------------------------------------------------------------------
-def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool) -> ProcessingResult:
+def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool,
+            user_instructions: str = "") -> ProcessingResult:
     started = time.time()
     provider_name = cfg.resolved_provider()
     result = ProcessingResult(
@@ -169,6 +174,7 @@ def _process(*, kind: str, ref: str, cfg: Config, make_pdf: bool) -> ProcessingR
                 url=url_for_report,
                 duration_str=format_timestamp(transcript.duration),
                 provider=provider,
+                user_instructions=user_instructions,
             )
 
             # -- 6. PDF ---------------------------------------------

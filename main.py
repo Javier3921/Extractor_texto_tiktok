@@ -2,10 +2,12 @@
 
 Uso:
     python main.py                              -> menu interactivo
+    python main.py --gui                        -> interfaz grafica (Tkinter)
     python main.py --url "URL_TIKTOK"           -> procesar un TikTok
     python main.py --file "C:\\v\\video.mp4"     -> procesar un video local
     python main.py --urls-file input/urls.txt   -> procesar varias URLs
     python main.py --provider gemini --url ...  -> forzar proveedor de IA
+    python main.py --url ... --instructions "Enfocate en los riesgos de seguridad"
     python main.py --config                     -> ver configuracion
 """
 from __future__ import annotations
@@ -49,8 +51,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-pdf", action="store_true", help="No generar el PDF")
     p.add_argument("--keep-temp", action="store_true",
                    help="Conservar la carpeta temporal aunque todo vaya bien")
+    p.add_argument("--instructions", metavar="TEXTO", default="",
+                   help="Indicaciones para la IA sobre que priorizar en el informe "
+                        "(--url/--file/--urls-file)")
     p.add_argument("--config", action="store_true",
                    help="Mostrar la configuracion actual y salir")
+    p.add_argument("--gui", action="store_true",
+                   help="Abrir la interfaz grafica (Tkinter) en vez de la CLI")
     return p
 
 
@@ -87,7 +94,8 @@ def show_config(cfg: Config) -> None:
 
 
 # --------------------------------------------------------------------------
-def run_batch(urls: list[str], cfg: Config, make_pdf: bool) -> int:
+def run_batch(urls: list[str], cfg: Config, make_pdf: bool, *,
+             user_instructions: str = "") -> int:
     from src.pipeline import process_url
     if not urls:
         print("[ERROR] No hay URLs que procesar.")
@@ -98,7 +106,8 @@ def run_batch(urls: list[str], cfg: Config, make_pdf: bool) -> int:
         print("=" * 60)
         print(f"  ({i}/{len(urls)})  {url}")
         print("=" * 60)
-        results.append(process_url(url, cfg, make_pdf=make_pdf))
+        results.append(process_url(url, cfg, make_pdf=make_pdf,
+                                   user_instructions=user_instructions))
 
     ok = sum(1 for r in results if r.ok)
     print("=" * 60)
@@ -133,18 +142,27 @@ def interactive_menu(cfg: Config) -> int:
         if choice == "1":
             url = input("  URL de TikTok > ").strip()
             if url:
-                process_url(url, cfg)
+                instructions = input(
+                    "  Indicaciones para la IA (que priorizar en el informe, opcional) > "
+                ).strip()
+                process_url(url, cfg, user_instructions=instructions)
         elif choice == "2":
             path = input("  Archivo de URLs [input/urls.txt] > ").strip() or "input/urls.txt"
+            instructions = input(
+                "  Indicaciones para la IA (se aplican a todas las URLs, opcional) > "
+            ).strip()
             try:
                 urls = read_urls_file(_resolve(path))
-                run_batch(urls, cfg, make_pdf=True)
+                run_batch(urls, cfg, make_pdf=True, user_instructions=instructions)
             except ExtractorError as e:
                 print(f"  [ERROR] {e}")
         elif choice == "3":
             path = input("  Ruta del archivo de video > ").strip().strip('"')
             if path:
-                process_file(path, cfg)
+                instructions = input(
+                    "  Indicaciones para la IA (que priorizar en el informe, opcional) > "
+                ).strip()
+                process_file(path, cfg, user_instructions=instructions)
         elif choice == "4":
             _change_provider(cfg)
         elif choice == "5":
@@ -196,20 +214,26 @@ def main(argv: list[str] | None = None) -> int:
         show_config(cfg)
         return 0
 
+    if args.gui:
+        from gui import run_gui
+        run_gui(cfg)
+        return 0
+
     make_pdf = not args.no_pdf
+    instructions = args.instructions
 
     try:
         if args.url:
             from src.pipeline import process_url
-            r = process_url(args.url, cfg, make_pdf=make_pdf)
+            r = process_url(args.url, cfg, make_pdf=make_pdf, user_instructions=instructions)
             return 0 if r.ok else 2
         if args.file:
             from src.pipeline import process_file
-            r = process_file(args.file, cfg, make_pdf=make_pdf)
+            r = process_file(args.file, cfg, make_pdf=make_pdf, user_instructions=instructions)
             return 0 if r.ok else 2
         if args.urls_file is not None:
             urls = read_urls_file(_resolve(args.urls_file))
-            return run_batch(urls, cfg, make_pdf=make_pdf)
+            return run_batch(urls, cfg, make_pdf=make_pdf, user_instructions=instructions)
         return interactive_menu(cfg)
     except KeyboardInterrupt:
         print("\n[INTERRUMPIDO] Cancelado por el usuario.")
