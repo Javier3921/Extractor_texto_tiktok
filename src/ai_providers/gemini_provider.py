@@ -7,8 +7,8 @@ from __future__ import annotations
 import logging
 import re
 
-from src.ai_providers.base import (AIAuthError, AIProvider, AIProviderError,
-                                   AIRateLimitError)
+from src.ai_providers.base import (AIAuthError, AIOverloadedError, AIProvider,
+                                   AIProviderError, AIRateLimitError)
 from src.utils import get_logger
 
 log = get_logger()
@@ -67,6 +67,14 @@ class GeminiProvider(AIProvider):
             if code == 429 or "resource_exhausted" in msg or "quota" in msg or "rate" in msg:
                 raise AIRateLimitError(
                     f"{self.name}: limite/cuota alcanzado (la capa gratuita tiene limites)."
+                ) from e
+            # Sobrecarga transitoria del servicio (pico de demanda): Google recomienda
+            # reintentar mas tarde, no es un fallo de configuracion.
+            if (code == 503 or "unavailable" in msg or "overloaded" in msg
+                    or "high demand" in msg):
+                raise AIOverloadedError(
+                    f"{self.name}: el servicio esta sobrecargado por alta demanda "
+                    "(temporal, no es un error de configuracion)."
                 ) from e
             # Modelo retirado: la API suele indicar el sustituto ("use models/xxx").
             if (code == 404 or "not_found" in msg or "no longer available" in msg

@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.ai_providers.base import AIAuthError, AIProviderError, AIRateLimitError
+from src.ai_providers.base import (AIAuthError, AIOverloadedError, AIProviderError,
+                                   AIRateLimitError)
 from src.ai_providers.gemini_provider import GeminiProvider
 
 
@@ -98,6 +99,62 @@ class TestClasificacionDeErrores:
         with pytest.raises(AIAuthError):
             p.complete("sys", "user")
         assert calls["n"] == 1
+
+
+class TestSobrecargaTransitoria:
+    def test_503_es_overloaded(self, monkeypatch):
+        p = _provider()
+        p.max_retries = 1
+
+        def boom(**_kw):
+            raise _FakeAPIError("UNAVAILABLE", code=503)
+
+        monkeypatch.setattr(p._client.models, "generate_content", boom)
+        with pytest.raises(AIOverloadedError):
+            p.complete("sys", "user")
+
+    def test_high_demand_sin_codigo_es_overloaded(self, monkeypatch):
+        p = _provider()
+        p.max_retries = 1
+
+        def boom(**_kw):
+            raise _FakeAPIError(
+                "This model is currently experiencing high demand. "
+                "Please try again later."
+            )
+
+        monkeypatch.setattr(p._client.models, "generate_content", boom)
+        with pytest.raises(AIOverloadedError):
+            p.complete("sys", "user")
+
+    def test_reintenta_con_backoff_y_se_recupera(self, monkeypatch):
+        import time as time_module
+        monkeypatch.setattr(time_module, "sleep", lambda _s: None)
+        p = _provider()  # max_retries por defecto (4): debe alcanzar para recuperarse
+        calls = {"n": 0}
+
+        def fake_generate(*, model, contents, config):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise _FakeAPIError("high demand, please try again later", code=503)
+            return _FakeResponse("ok")
+
+        monkeypatch.setattr(p._client.models, "generate_content", fake_generate)
+        assert p.complete("sys", "user") == "ok"
+        assert calls["n"] == 3
+
+    def test_agota_reintentos_y_propaga_overloaded(self, monkeypatch):
+        import time as time_module
+        monkeypatch.setattr(time_module, "sleep", lambda _s: None)
+        p = _provider()
+        p.max_retries = 2
+
+        def boom(**_kw):
+            raise _FakeAPIError("UNAVAILABLE", code=503)
+
+        monkeypatch.setattr(p._client.models, "generate_content", boom)
+        with pytest.raises(AIOverloadedError):
+            p.complete("sys", "user")
 
 
 class TestAutocambioDeModelo:

@@ -26,11 +26,16 @@ class AIRateLimitError(AIProviderError):
     """Se alcanzo el limite de peticiones del proveedor."""
 
 
+class AIOverloadedError(AIProviderError):
+    """El servicio esta temporalmente sobrecargado (503/UNAVAILABLE, alta
+    demanda). Es transitorio: el proveedor recomienda reintentar mas tarde."""
+
+
 class AIProvider(abc.ABC):
     """Base de todos los proveedores."""
 
     name: str = "base"
-    max_retries: int = 3
+    max_retries: int = 4
     retry_base_delay: float = 4.0
 
     def __init__(self, api_key: str, model: str):
@@ -51,13 +56,13 @@ class AIProvider(abc.ABC):
                 return self._complete_raw(system, user, want_json, max_tokens)
             except AIAuthError:
                 raise
-            except AIRateLimitError as e:
+            except (AIRateLimitError, AIOverloadedError) as e:
                 last_err = e
                 if attempt == self.max_retries:
                     break
                 delay = self.retry_base_delay * attempt
-                log.warning("%s: rate limit, reintento %d/%d en %.0fs",
-                            self.name, attempt, self.max_retries, delay)
+                log.warning("%s: %s (reintento %d/%d en %.0fs)",
+                            self.name, e, attempt, self.max_retries, delay)
                 time.sleep(delay)
             except AIProviderError as e:
                 last_err = e

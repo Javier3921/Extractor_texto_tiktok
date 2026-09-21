@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.ai_providers.base import (AIAuthError, AIProvider, AIProviderError,
-                                   AIRateLimitError)
+from src.ai_providers.base import (AIAuthError, AIOverloadedError, AIProvider,
+                                   AIProviderError, AIRateLimitError)
 from src.ai_providers.mock_provider import (MARK_ANALYZE, MARK_TRANSLATE,
                                             MockProvider)
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # evita import circular en runtime
 
 __all__ = [
     "get_provider", "AIProvider", "AIProviderError", "AIAuthError",
-    "AIRateLimitError", "MARK_ANALYZE", "MARK_TRANSLATE",
+    "AIRateLimitError", "AIOverloadedError", "MARK_ANALYZE", "MARK_TRANSLATE",
 ]
 
 

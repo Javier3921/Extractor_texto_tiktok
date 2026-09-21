@@ -492,6 +492,7 @@ pero es de pago y limita a 25 MB por archivo de audio.
 | Descarga enorme al instalar | Es PyTorch (backend Whisper local). Alternativa: `TRANSCRIPTION_BACKEND=openai_api`. |
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |
 | `Falta la clave de API para gemini` | Rellena `GEMINI_API_KEY` en `.env` o usa `--provider mock`. |
+| PDF degradado con `error 503 UNAVAILABLE` / `high demand` | La capa gratuita de Gemini está saturada por demanda alta (temporal, no es un problema de configuración). El sistema ya reintenta automáticamente con espera creciente; si aun así falla, espera unos minutos y vuelve a procesar el mismo video (el `.txt` no se pierde). |
 | La 1.ª transcripción tarda | Descarga el modelo Whisper (`small` ≈ 490 MB). Solo la primera vez. |
 | El PDF sale con fuente distinta | Si no hay `C:\Windows\Fonts\arial.ttf`, usa Helvetica. El texto español se renderiza igual. |
 
