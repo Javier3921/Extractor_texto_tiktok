@@ -21,19 +21,26 @@
 10. [Cómo se probó](#10-cómo-se-probó)
 11. [Solución de problemas](#11-solución-de-problemas)
 12. [Limitaciones y decisiones de diseño](#12-limitaciones-y-decisiones-de-diseño)
-13. [Cambios de esta sesión](#13-cambios-de-esta-sesión)
+13. [Historial de cambios](#13-historial-de-cambios)
 
 ---
 
 ## 1. Resumen y pipeline
 
-**Extractor_texto_tiktok** es una aplicación de línea de comandos (Python) que, a partir de una
-URL de TikTok **o** de un archivo de vídeo local, produce:
+**Extractor_texto_tiktok** es una aplicación Python (CLI, menú interactivo o una pequeña
+interfaz gráfica) que, a partir de una URL de TikTok **o** de un archivo de vídeo local,
+produce:
 
 - un archivo **`.txt`** con la información del vídeo + la transcripción original + la traducción
   al español, y
-- un **informe técnico `.pdf`** profesional, **redactado íntegramente en español**, generado
-  por una IA que analiza el contenido.
+- un **informe técnico `.html`** autónomo (sin dependencias, con gráficos SVG),
+  **redactado íntegramente en español**, generado por una IA que analiza el contenido. Hasta
+  septiembre de 2026 este informe se generaba en `.pdf` con ReportLab; se sustituyó por HTML
+  (ver [sección 13](#13-historial-de-cambios)) porque pesa una fracción de lo mismo y permite
+  gráficos reales.
+
+Opcionalmente, el usuario puede darle **indicaciones a la IA** (`--instructions`, el menú o la
+GUI) sobre qué priorizar en el informe.
 
 Ubicación del proyecto (ajusta la ruta a donde lo tengas):
 `C:\ruta\a\Extractor_texto_tiktok`
@@ -60,13 +67,25 @@ Ubicación del proyecto (ajusta la ruta a donde lo tengas):
           │
    escribir  output/txt/<id>.txt
           │
-   [5b] análisis técnico con IA   (JSON con 12 apartados; reglas anti-alucinación)
+   [5b] análisis técnico con IA   (JSON con 12 apartados; reglas anti-alucinación;
+          │                        admite instrucciones opcionales del usuario)
           │
-   [6] generar  output/pdf/reporte_<id>.pdf   (portada + secciones A–L, en español)
+   [6] generar  output/html/reporte_<id>.html   (secciones A–L + gráficos, en español)
 ```
 
 **Nunca se descarga ni se guarda el vídeo.** Solo se obtiene la pista de audio, de forma
 temporal, y se borra al terminar (ver [sección 9](#9-dónde-queda-el-audio-del-tiktok)).
+
+### Tres formas de usarlo
+
+1. **CLI directa**: `python main.py --url "..."` (o `--file`), con flags como `--provider`,
+   `--ai-model`, `--instructions`, `--no-html`.
+2. **Menú interactivo**: `python main.py` sin argumentos.
+3. **Interfaz gráfica** (Tkinter, sin dependencias nuevas): `python main.py --gui`. Pide la URL
+   y, opcionalmente, indicaciones para la IA; procesa en un hilo aparte (no congela la ventana)
+   y al terminar muestra en un `messagebox` dónde quedaron el `.txt` y el `.html`.
+
+Las tres llaman al mismo `src/pipeline.py::process_url` / `process_file`; ninguna duplica lógica.
 
 ---
 
@@ -126,10 +145,13 @@ Se inspeccionó el entorno de la máquina:
     `mock_provider` + fábrica `get_provider`).
 11. `src/ai_analyzer.py` (prompt de análisis con reglas anti-alucinación; JSON → `AnalysisReport`).
 12. `src/txt_writer.py` (formato exacto del `.txt`).
-13. `src/pdf_generator.py` (ReportLab: portada + secciones A–L + numeración + fuente Unicode).
-14. `src/pipeline.py` (orquestador de las 6 etapas) + `main.py` (CLI + menú interactivo).
-15. `tests/` (86 tests con `pytest`, todos con mocks; sin red ni torch).
-16. Documentación (`README.md` y esta guía).
+13. `src/html_generator.py` (HTML autónomo: CSS y SVG inline, sin JS; secciones A–L +
+    gráfico de tecnologías + insignia de dificultad). Sustituyó a un `src/pdf_generator.py`
+    original con ReportLab (ver [sección 13](#13-historial-de-cambios)).
+14. `src/pipeline.py` (orquestador de las 6 etapas) + `main.py` (CLI + menú interactivo) +
+    `gui.py` (interfaz gráfica, Tkinter).
+15. `tests/` (121 tests con `pytest`, todos con mocks; sin red ni torch ni display).
+16. Documentación (`README.md`, `CLAUDE.md` local y esta guía).
 
 ### 2.4. Incidencia resuelta durante las pruebas
 
@@ -142,10 +164,32 @@ Correcciones aplicadas:
 - **Autocorrección de modelo**: si la API devuelve un 404 indicando el sustituto
   (`use models/xxx`), el proveedor Gemini cambia solo al modelo nuevo y reintenta una vez.
 - **El análisis con IA ya no aborta todo el procesamiento** si el proveedor falla (cuota
-  agotada, modelo caído, red): el `.txt` se genera igualmente y el `.pdf` sale en modo
-  degradado dejando constancia del motivo. Solo `AIAuthError` (clave inválida/ausente) corta
-  el proceso, y sin reintentos inútiles.
+  agotada, modelo caído, red): el `.txt` se genera igualmente y el informe sale en modo
+  degradado dejando constancia del motivo (actualmente en `.html`; era `.pdf` hasta que se
+  cambió el formato, ver [sección 13](#13-historial-de-cambios)). Solo `AIAuthError` (clave
+  inválida/ausente) corta el proceso, y sin reintentos inútiles.
 - Nueva opción de CLI `--ai-model NOMBRE` para forzar el modelo del proveedor.
+
+### 2.5. Incidencias resueltas en sesiones posteriores
+
+Resumen breve; el detalle completo (con qué se probó) está en la
+[sección 13, Historial de cambios](#13-historial-de-cambios).
+
+- **TikTok empezó a exigir "impersonation" TLS** (para no bloquear la petición como bot) y
+  `yt-dlp` fallaba con `Unexpected response from webpage request`. Se resolvió instalando y
+  declarando `curl_cffi` en `requirements.txt` (no se importa en ningún módulo propio; lo usa
+  `yt-dlp` internamente — no es una dependencia muerta).
+- **Gemini devuelve 503 "sobrecargado por alta demanda"** de forma esporádica (problema de
+  capacidad de Google, no de configuración). Se añadió `AIOverloadedError` con el mismo backoff
+  creciente que un rate-limit, y un **fallback automático** a un modelo más ligero
+  (`GEMINI_FALLBACK_MODEL`, por defecto `gemini-flash-lite-latest`) si el modelo principal sigue
+  sobrecargado tras agotar los reintentos.
+- **El regex de autocambio de modelo retirado** (`_MODEL_MOVED`) era sensible a mayúsculas y
+  podía no detectar el sustituto si la API capitalizaba distinto ("Use models/…"). Se le añadió
+  `re.IGNORECASE`.
+- **`--keep-temp` no tenía efecto**: solo forzaba `KEEP_TEMP_ON_ERROR=true`, que ya era el valor
+  por defecto, así que no cambiaba nada en el caso de éxito. Se separó en dos flags
+  independientes (`keep_on_error` / `always_keep`) en `TempWorkspace`.
 
 ---
 
@@ -154,12 +198,14 @@ Correcciones aplicadas:
 ```
 Extractor_texto_tiktok/
 ├── main.py                     # CLI (argparse) + menú interactivo de 6 opciones
+├── gui.py                      # interfaz grafica (Tkinter), python main.py --gui
 ├── config.py                   # Config (dataclass) desde .env: validación, rutas, claves enmascaradas
 ├── requirements.txt            # dependencias
 ├── .env / .env.example         # credenciales y ajustes (.env está en .gitignore)
 ├── run.bat                     # lanzador Windows: crea .venv + instala deps la 1ª vez
-├── README.md                   # manual de usuario
+├── README.md                   # manual de usuario (documentación pública)
 ├── GUIA_DEL_PROYECTO.md        # este documento
+├── CLAUDE.md                   # contexto privado para agentes de IA (NO se sube a Git)
 │
 ├── src/
 │   ├── models.py               # dataclasses compartidas
@@ -170,33 +216,38 @@ Extractor_texto_tiktok/
 │   ├── transcriber.py          # transcribe(): backend 'local' (openai-whisper) | 'openai_api'
 │   ├── language_detector.py    # detect_language(): Whisper + langdetect; mapa de nombres
 │   ├── translator.py           # translate_to_spanish(): por lotes; conserva original y timestamps
-│   ├── ai_analyzer.py          # analyze_content(): prompt + JSON → AnalysisReport; informe degradado
+│   ├── ai_analyzer.py          # analyze_content(): prompt + JSON → AnalysisReport; admite
+│   │                           #   user_instructions; informe degradado si el proveedor falla
 │   ├── txt_writer.py           # build_txt / write_txt: formato exacto del .txt
-│   ├── pdf_generator.py        # build_pdf: ReportLab, portada + A–L, "Página X de Y", Unicode
+│   ├── html_generator.py       # build_html: HTML autónomo (CSS/SVG inline, sin JS), A–L +
+│   │                           #   gráfico de tecnologías + insignia de dificultad
 │   ├── utils.py                # logging+SecretFilter, sanitize_filename, safe_output_path,
 │   │                           #   extract_video_id, format_timestamp, extract_json,
 │   │                           #   resolve_ffmpeg, TempWorkspace, read_urls_file
 │   └── ai_providers/
-│       ├── __init__.py         # get_provider(name, cfg) -> AIProvider
-│       ├── base.py             # AIProvider (ABC): complete(), complete_json(), reintentos/backoff
+│       ├── __init__.py         # get_provider(name, cfg, timeout=..., ) -> AIProvider
+│       ├── base.py             # AIProvider (ABC): complete(), complete_json(), reintentos/backoff;
+│       │                       #   AIProviderError / AIAuthError / AIRateLimitError / AIOverloadedError
 │       ├── openai_provider.py  # SDK openai; response_format JSON
-│       ├── gemini_provider.py  # SDK google-genai; autocorrección de modelo retirado
+│       ├── gemini_provider.py  # SDK google-genai; autocorrección de modelo retirado; timeout de
+│       │                       #   red; fallback a GEMINI_FALLBACK_MODEL si se sobrecarga (503)
 │       ├── deepseek_provider.py# = OpenAIProvider con base_url de DeepSeek
 │       └── mock_provider.py    # respuestas deterministas offline (tests / sin clave)
 │
 ├── input/urls.txt              # una URL por línea (para procesar en lote)
-├── output/txt/  ·  output/pdf/ # resultados
+├── output/txt/  ·  output/html/ # resultados
 ├── temp/                       # carpetas de trabajo temporales (se borran al terminar)
 ├── logs/                       # logs diarios (sin secretos)
-└── tests/                      # 86 tests pytest
+└── tests/                      # 121 tests pytest
 ```
 
 ### Responsabilidad de cada archivo
 
 | Archivo | Qué hace |
 |---|---|
-| `main.py` | Analiza argumentos; si no hay, muestra el menú de 6 opciones. Carga `Config`, aplica overrides de CLI, arranca el logging y llama al `pipeline`. |
-| `config.py` | `Config.load()` lee `.env` + variables de entorno, valida (`AI_PROVIDER`, backend, modelo Whisper), crea carpetas, y enmascara las claves para mostrarlas. `DEFAULT_AI_MODELS` define el modelo por defecto de cada proveedor. |
+| `main.py` | Analiza argumentos; si no hay, muestra el menú de 6 opciones. Carga `Config`, aplica overrides de CLI, arranca el logging y llama al `pipeline`. Con `--gui` delega en `gui.py` en vez de la CLI. |
+| `gui.py` | Ventana Tkinter (stdlib): URL + cuadro de indicaciones para la IA + botón. Corre `process_url` en un hilo aparte (no congela la ventana) y muestra el resultado (rutas de `.txt`/`.html`) en un `messagebox`. Sin tests automatizados (requiere display). |
+| `config.py` | `Config.load()` lee `.env` + variables de entorno, valida (`AI_PROVIDER`, backend, modelo Whisper), crea carpetas, y enmascara las claves para mostrarlas. `DEFAULT_AI_MODELS` define el modelo por defecto de cada proveedor; `gemini_fallback_model` (`GEMINI_FALLBACK_MODEL`) el modelo de reserva de Gemini. |
 | `src/pipeline.py` | Ejecuta las 6 etapas en orden, imprime `[1/6]…[6/6]` y los `[INFO]/[OK]`, gestiona la carpeta temporal (`TempWorkspace`) y devuelve un `ProcessingResult` con rutas y errores. |
 | `src/tiktok_downloader.py` | `validate_url` (http/https + host), `is_tiktok_url` (dominios de TikTok), `fetch_audio(url, workdir)` con `yt-dlp` `format="bestaudio/best"`; mapea los errores de yt-dlp a mensajes claros (privado, geobloqueo, 403/rate-limit, no encontrado). No usa cookies ni login. |
 | `src/local_video.py` | Comprueba que el archivo existe y que la extensión está soportada (`mp4, mov, mkv, webm, avi, m4v, flv` y audio suelto: `mp3, wav, m4a, aac, ogg, flac`). |
@@ -204,12 +255,12 @@ Extractor_texto_tiktok/
 | `src/transcriber.py` | `transcribe()`. Backend `local`: `whisper.load_model()` (cacheado) y `model.transcribe(array)`; lee el WAV con `wave` para no depender del `ffmpeg` del PATH. Backend `openai_api`: `client.audio.transcriptions.create(model="whisper-1")` (límite 25 MB). |
 | `src/language_detector.py` | `detect_language()`: usa el idioma que devuelve Whisper (basado en audio) como primario y `langdetect` sobre el texto como verificación. Devuelve `LanguageInfo(code, name, is_spanish, …)`. |
 | `src/translator.py` | Si el idioma ya es español → no traduce. Si no → traduce por lotes de ~40 segmentos con el proveedor de IA; conserva `start/end`, el nº de segmentos y los términos técnicos (React, Node.js, REST API, OAuth 2.0, Docker, Kubernetes…). Degrada a traducción segmento-a-segmento si un lote falla; `AIAuthError` corta. |
-| `src/ai_analyzer.py` | Construye el prompt (transcripción ES como contenido principal + original para verificar términos) con reglas anti-alucinación (distinguir *información explícita* / *inferencia* / *recomendación*; no inventar). Pide JSON, lo valida/repara → `AnalysisReport`. Si el JSON es irrecuperable → informe de reserva. Si el proveedor falla (no-auth) → informe degradado (no rompe el pipeline). |
+| `src/ai_analyzer.py` | Construye el prompt (transcripción ES como contenido principal + original para verificar términos + instrucciones opcionales del usuario) con reglas anti-alucinación (distinguir *información explícita* / *inferencia* / *recomendación*; no inventar) y una guarda explícita contra instrucciones ocultas en la transcripción (contenido de terceros no confiable). Pide JSON, lo valida/repara → `AnalysisReport`. Si el JSON es irrecuperable → informe de reserva. Si el proveedor falla (no-auth) → informe degradado (no rompe el pipeline). |
 | `src/txt_writer.py` | Genera el `.txt` con el formato exacto: bloque `INFORMACION DEL VIDEO`, luego `TRANSCRIPCION ORIGINAL` (solo si hubo traducción) y `TRANSCRIPCION EN ESPANOL`, con líneas `[mm:ss] texto`. UTF-8. |
-| `src/pdf_generator.py` | ReportLab/Platypus. Registra Arial de `C:\Windows\Fonts` (o Helvetica) para acentos/`ñ`/`¿¡`. Portada + secciones **A–L**, tabla de tecnologías, recuadro de dificultad, pie `Página X de Y`, encabezado. |
-| `src/utils.py` | Utilidades transversales: logging a `logs/run_AAAAMMDD.log` con `SecretFilter` (redacta claves), `sanitize_filename`, `safe_output_path` (anti path-traversal), `extract_video_id`, `format_timestamp`, `extract_json` (tolera ```` ``` ````, texto alrededor, JSON truncado), `resolve_ffmpeg`, `TempWorkspace` (borra la carpeta al salir con éxito), `read_urls_file`. |
-| `src/ai_providers/base.py` | `AIProvider` (ABC). `complete()` con reintentos y backoff ante rate-limit/errores transitorios; `complete_json()` usa `extract_json`. Excepciones: `AIProviderError`, `AIAuthError`, `AIRateLimitError`. |
-| `src/ai_providers/gemini_provider.py` | SDK `google-genai`. Mapea 401/403 → `AIAuthError`, 429/quota → `AIRateLimitError`, 404 modelo retirado → **cambia al modelo que indica la API y reintenta**. |
+| `src/html_generator.py` | `build_html()`: un único archivo HTML con CSS y SVG *inline*, sin JavaScript ni peticiones externas. Secciones **A–L**, tabla + gráfico de barras SVG de tecnologías por categoría, insignia de color para la dificultad, estilos `@media print`. Todo el contenido pasa por `html.escape()` antes de insertarse (el contenido viene en última instancia de un vídeo de terceros). |
+| `src/utils.py` | Utilidades transversales: logging a `logs/run_AAAAMMDD.log` con `SecretFilter` (redacta claves), `sanitize_filename`, `safe_output_path` (anti path-traversal), `extract_video_id`, `format_timestamp`, `extract_json` (tolera ```` ``` ````, texto alrededor, JSON truncado), `resolve_ffmpeg`, `TempWorkspace` (borra la carpeta al salir con éxito **solo si se llamó a `mark_ok()`**; `always_keep`/`keep_on_error` son flags independientes), `read_urls_file`. |
+| `src/ai_providers/base.py` | `AIProvider` (ABC). `complete()` con reintentos y backoff ante rate-limit/sobrecarga/errores transitorios (`max_retries=4`); `complete_json()` usa `extract_json`. Excepciones: `AIProviderError`, `AIAuthError` (nunca se reintenta), `AIRateLimitError`, `AIOverloadedError` (503/alta demanda; mismo backoff creciente que el rate-limit). |
+| `src/ai_providers/gemini_provider.py` | SDK `google-genai`. Mapea 401/403 → `AIAuthError`, 429/quota → `AIRateLimitError`, 503/"high demand" → `AIOverloadedError`, 404 modelo retirado → **cambia al modelo que indica la API y reintenta** (regex case-insensitive). `complete()` está sobreescrito: si tras agotar los reintentos sigue sobrecargado, prueba una vez con `GEMINI_FALLBACK_MODEL` antes de rendirse. Recibe también `timeout` (→ `http_options` del SDK, evita que una llamada colgada bloquee el pipeline). |
 | `src/ai_providers/openai_provider.py` / `deepseek_provider.py` | SDK `openai`; DeepSeek = la misma clase con `base_url="https://api.deepseek.com"`. |
 | `src/ai_providers/mock_provider.py` | Proveedor simulado: traducción "de marcador" (conserva términos técnicos) y un `AnalysisReport` JSON válido derivado del texto. Se usa con `--provider mock` o `AI_PROVIDER=mock`. |
 
@@ -222,7 +273,7 @@ Extractor_texto_tiktok/
   translated_to_spanish, executive_summary, detailed_explanation, technologies[],
   technical_concepts[], architecture, code_analysis, best_practices[], risks[],
   recommendations[], difficulty, applications[], conclusion` (+ `parse_warning` interno).
-- `ProcessingResult` — id, rutas de TXT/PDF, idioma, si hubo traducción, proveedor/modelo,
+- `ProcessingResult` — id, rutas de TXT/HTML, idioma, si hubo traducción, proveedor/modelo,
   error y tiempo.
 
 ---
@@ -297,6 +348,7 @@ Copia `.env.example` a `.env` y rellena lo que necesites. Variables:
 |---|---|---|---|
 | `AI_PROVIDER` | `gemini` `openai` `deepseek` `mock` | `gemini` | Proveedor de traducción + análisis. |
 | `AI_MODEL` | texto | *(vacío)* | Modelo concreto. Vacío = el por defecto del proveedor. |
+| `GEMINI_FALLBACK_MODEL` | texto | `gemini-flash-lite-latest` | Solo Gemini: si el modelo principal se sobrecarga (503) y se agotan los reintentos, se prueba una vez con este. Vacío = desactivado. |
 | `OPENAI_API_KEY` | texto | — | Clave de OpenAI. |
 | `GEMINI_API_KEY` | texto | — | Clave de Google AI Studio (gratuita). |
 | `DEEPSEEK_API_KEY` | texto | — | Clave de DeepSeek. |
@@ -305,10 +357,10 @@ Copia `.env.example` a `.env` y rellena lo que necesites. Variables:
 | `OUTPUT_DIRECTORY` | ruta | `output` | Carpeta de resultados. |
 | `TEMP_DIRECTORY` | ruta | `temp` | Carpeta temporal. |
 | `LOGS_DIRECTORY` | ruta | `logs` | Carpeta de logs. |
-| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red de `yt-dlp`. |
-| `MAX_VIDEO_MB` | entero | `200` | Límite de tamaño para archivos locales. |
+| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red de `yt-dlp` **y** de las llamadas al proveedor de IA. |
+| `MAX_VIDEO_MB` | entero | `200` | Límite de tamaño para archivos locales **y** para el audio descargado de TikTok. |
 | `ALLOW_MOCK_FALLBACK` | `true`/`false` | `false` | Si el proveedor elegido no tiene clave, usar `mock` en vez de fallar. |
-| `KEEP_TEMP_ON_ERROR` | `true`/`false` | `true` | Conservar `temp/job_<id>/` cuando un procesamiento **falla** (para depurar). |
+| `KEEP_TEMP_ON_ERROR` | `true`/`false` | `true` | Conservar `temp/job_<id>/` cuando un procesamiento **falla** (para depurar). Independiente de `--keep-temp` (CLI), que conserva la carpeta **siempre**, incluso en éxito. |
 
 ### Conseguir la API key de Gemini (gratis)
 
@@ -343,11 +395,27 @@ python main.py
 6. Salir
 ```
 
+### Interfaz gráfica
+
+```bat
+python main.py --gui
+```
+
 ### Un TikTok por URL
 
 ```bat
 python main.py --url "https://www.tiktok.com/@usuario/video/1234567890123456789"
 ```
+
+### Indicaciones para la IA (qué priorizar en el informe)
+
+```bat
+python main.py --url "..." --instructions "Enfocate en los riesgos de seguridad"
+```
+
+Disponible también en el menú interactivo (te lo pregunta al procesar) y en la GUI (cuadro de
+texto). Guía el énfasis del informe dentro del mismo formato; no autoriza a la IA a inventar
+datos que no estén en la transcripción.
 
 ### Un archivo de vídeo (o audio) local  —  plan B si TikTok bloquea
 
@@ -393,7 +461,7 @@ python main.py --url "..." --model tiny
 ### Otras opciones
 
 ```bat
-python main.py --file "C:\Videos\clip.mp4" --no-pdf      # genera solo el .txt
+python main.py --file "C:\Videos\clip.mp4" --no-html     # genera solo el .txt
 python main.py --file "C:\Videos\clip.mp4" --keep-temp   # no borra temp/ aunque todo vaya bien
 python main.py --config                                  # muestra la configuración y sale
 python main.py --help                                    # ayuda de argparse
@@ -406,7 +474,7 @@ python main.py --help                                    # ayuda de argparse
 python main.py --url "https://www.tiktok.com/@u/video/123..."
 
 :: Lote nocturno, solo TXT, modelo rápido
-python main.py --urls-file --no-pdf --model tiny
+python main.py --urls-file --no-html --model tiny
 
 :: Probar el pipeline completo sin gastar cuota de IA
 python main.py --file "C:\Videos\demo.mp4" --provider mock
@@ -426,11 +494,11 @@ pytest -q
 ```
 output/
 ├── txt/
-│   ├── tiktok_<id>.txt                 (TikTok)
-│   └── local_<nombre>_<fecha>.txt      (archivo local)
-└── pdf/
-    ├── reporte_tiktok_<id>.pdf
-    └── reporte_local_<nombre>_<fecha>.pdf
+│   ├── tiktok_<id>.txt                  (TikTok)
+│   └── local_<nombre>_<fecha>.txt       (archivo local)
+└── html/
+    ├── reporte_tiktok_<id>.html
+    └── reporte_local_<nombre>_<fecha>.html
 ```
 
 ### Formato del `.txt`
@@ -461,19 +529,23 @@ TRANSCRIPCION EN ESPANOL
 Si el vídeo ya está en español, solo aparece el bloque **TRANSCRIPCION EN ESPANOL** con el
 texto original.
 
-### Estructura del `.pdf`
+### Estructura del `.html`
 
-Portada (título, URL/origen, fecha, idioma original, estado de traducción, proveedor/modelo de
-IA, dificultad) + secciones:
+Un único archivo **autónomo**: CSS y SVG *inline*, sin JavaScript, sin peticiones externas — se
+abre con doble clic en cualquier navegador, incluso sin internet. Cabecera (título, URL/origen,
+fecha, idioma original, estado de traducción, proveedor/modelo de IA) + secciones:
 
 **A** Resumen ejecutivo · **B** Explicación detallada · **C** Tecnologías (tabla
-Categoría/Elemento) · **D** Conceptos técnicos · **E** Arquitectura · **F** Análisis de código ·
-**G** Buenas prácticas · **H** Riesgos · **I** Recomendaciones · **J** Nivel de dificultad ·
-**K** Aplicaciones · **L** Conclusión.
+Categoría/Elemento + **gráfico de barras SVG** por categoría, si hay más de una) ·
+**D** Conceptos técnicos · **E** Arquitectura · **F** Análisis de código ·
+**G** Buenas prácticas · **H** Riesgos · **I** Recomendaciones · **J** Nivel de dificultad
+(insignia de color) · **K** Aplicaciones · **L** Conclusión.
 
-Con numeración `Página X de Y`, encabezado, y acentos/`ñ`/`¿¡` correctos. Los nombres técnicos
-(`React`, `Node.js`, `REST API`, `Docker`, `Kubernetes`…) se conservan sin traducir. El
-análisis distingue de forma explícita lo dicho en el vídeo, lo inferido y las recomendaciones.
+Incluye estilos `@media print` (se puede "Guardar como PDF" desde el navegador si aún se
+necesita ese formato puntualmente). Los nombres técnicos (`React`, `Node.js`, `REST API`,
+`Docker`, `Kubernetes`…) se conservan sin traducir. El análisis distingue de forma explícita lo
+dicho en el vídeo, lo inferido y las recomendaciones. Pesa una fracción de lo que pesaba el PDF
+(unos ~8 KB para un informe típico, frente a ~100 KB).
 
 ---
 
@@ -508,7 +580,7 @@ Detalles:
 - Para un archivo local (`--file`), no se descarga nada: se usa tu propio archivo y solo se
   crea el `audio_16k.wav` temporal, que también se borra.
 - Lo único que **persiste** en disco tras un procesamiento correcto: el `.txt` en
-  `output/txt/` y el `.pdf` en `output/pdf/`. Y los logs en `logs/` (sin claves ni secretos).
+  `output/txt/` y el `.html` en `output/html/`. Y los logs en `logs/` (sin claves ni secretos).
 - Si quieres inspeccionar el audio de una ejecución concreta, añade `--keep-temp` y lo
   encontrarás en `temp/job_<id>/`.
 
@@ -516,25 +588,33 @@ Detalles:
 
 ## 10. Cómo se probó
 
-### 10.1. Tests unitarios (`pytest`) — 86, todos en verde
+### 10.1. Tests unitarios (`pytest`) — 121, todos en verde
 
-No hacen descargas reales de TikTok ni llamadas reales a APIs (usan el proveedor `mock` y
-`monkeypatch`), y no necesitan PyTorch.
+No hacen descargas reales de TikTok ni llamadas reales a APIs (usan el proveedor `mock`, dobles
+del SDK de Gemini y `monkeypatch`), y no necesitan PyTorch ni un display (`gui.py` no tiene
+tests automatizados por eso mismo).
 
 | Archivo | Qué cubre |
 |---|---|
 | `tests/test_url_validation.py` | `validate_url` / `is_tiktok_url`: válidas, inválidas, no-TikTok, enlaces `vm./vt.`, dominios "parecidos" rechazados. |
 | `tests/test_utils_filenames.py` | `sanitize_filename` (sin `..`, sin separadores), `safe_output_path` (anti path-traversal), `extract_video_id`, `format_timestamp`. |
+| `tests/test_temp_workspace.py` | `TempWorkspace`: se borra en éxito, se conserva con `keep_on_error`/`always_keep` (flags independientes). |
+| `tests/test_tiktok_max_filesize.py` | `MAX_VIDEO_MB` se traduce en `max_filesize` para `yt-dlp` al descargar de TikTok. |
 | `tests/test_config.py` | Parseo de `.env`, valores por defecto, validación (proveedor/backend/modelo inválidos), creación de carpetas, enmascarado de claves, `resolved_provider()` con/sin fallback a `mock`. |
 | `tests/test_language_detector.py` | Detección es/en, nombres de idioma, `is_spanish`, "Whisper gana" ante discrepancia. |
-| `tests/test_translator.py` | Español → no traduce; inglés → traduce conservando nº de segmentos y timestamps; términos técnicos intactos; lotes grandes (95 segmentos). |
+| `tests/test_translator.py` | Español → no traduce; inglés → traduce conservando nº de segmentos y timestamps; términos técnicos intactos; lotes grandes (95 segmentos); fallo persistente se contabiliza (no se silencia). |
+| `tests/test_gemini_provider.py` | Clasificación de errores del SDK (auth/rate-limit/sobrecarga 503/genérico), auth no reintenta, autocambio de modelo retirado (case-insensitive, sin bucle), timeout de construcción, **fallback a `GEMINI_FALLBACK_MODEL` tras agotar reintentos**. |
 | `tests/test_txt_writer.py` | Cabeceras exactas, líneas `[mm:ss]`, dos secciones si hubo traducción, una sola si el original ya era español, nombre de archivo. |
-| `tests/test_ai_parser.py` | `extract_json` (limpio, entre ```` ``` ````, con texto alrededor, anidado, truncado, vacío); `_coerce_report` (relleno de campos, coerción lista↔cadena); `analyze_content` (JSON válido a la 1ª, reintento, doble fallo → informe de reserva, **error del proveedor → informe degradado**, **`AIAuthError` → se propaga**). |
-| `tests/test_pdf_generator.py` | Genera PDF en carpeta temporal: existe, empieza por `%PDF`, > 2 KB; acentos y `¿?`; informe vacío; tecnologías como lista de cadenas. |
+| `tests/test_ai_parser.py` | `extract_json` (limpio, entre ```` ``` ````, con texto alrededor, anidado, truncado, vacío); `_coerce_report` (relleno de campos, coerción lista↔cadena); `analyze_content` (JSON válido a la 1ª, reintento, doble fallo → informe de reserva, **error del proveedor → informe degradado**, **`AIAuthError` → se propaga**, `user_instructions` se incluye/omite en el prompt). |
+| `tests/test_html_generator.py` | Genera HTML válido (bien formado, sin `<script>`); el contenido de la IA se escapa (anti-XSS, dado que en última instancia viene de un vídeo de terceros); acentos y `¿?`; informe vacío; gráfico SVG solo con ≥2 categorías; insignia de dificultad. |
 
-Comando: `pytest -q` → `86 passed`.
+Comando: `pytest -q` → `121 passed`.
 
 ### 10.2. Prueba end-to-end real
+
+> Nota: esta prueba se hizo cuando el informe todavía se generaba en `.pdf` (antes del cambio a
+> `.html` de la [sección 13](#13-historial-de-cambios)). Se deja tal cual como registro
+> histórico; el pipeline y las reglas anti-alucinación no cambiaron, solo el formato de salida.
 
 Como TikTok bloquea la IP de descarga en este entorno (comportamiento esperado, por eso existe
 `--file`), la prueba completa se hizo con un **vídeo local generado**:
@@ -571,14 +651,16 @@ Como TikTok bloquea la IP de descarga en este entorno (comportamiento esperado, 
 |---|---|
 | `FFmpeg no esta disponible` | Reinstala dependencias (`pip install -r requirements.txt`) o instala FFmpeg del sistema (`winget install --id Gyan.FFmpeg -e`). |
 | `TikTok ha bloqueado o limitado la peticion` | Actualiza yt-dlp (`pip install -U yt-dlp`), espera un rato, o descarga el vídeo a mano y usa `--file`. |
+| `Unexpected response from webpage request` (con aviso de "impersonation") | Falta `curl_cffi` (TikTok exige imitar el TLS de un navegador). Instala con `pip install -U curl_cffi` (ya está en `requirements.txt`). |
 | `El video es privado, restringido…` | El contenido no es público. La app no accede a contenido no público. |
 | `gemini: el modelo '…' no existe` | Pon un modelo válido en `AI_MODEL` (o `--ai-model`). Gemini intenta autocorregirse; si no puede, indica el nombre nuevo. |
+| Informe degradado con `error 503 UNAVAILABLE` / `high demand` | Capa gratuita de Gemini saturada (temporal, no es un problema de configuración). Ya reintenta con backoff y cae a `GEMINI_FALLBACK_MODEL` si sigue sobrecargado; si aun así falla, espera unos minutos y reprocesa (el `.txt` no se pierde). |
 | `Falta GEMINI_API_KEY` / `clave de API rechazada` | Rellena la clave correcta en `.env`, o usa `--provider mock`. |
 | Instalación enorme | Es PyTorch (backend Whisper local). Alternativa: `TRANSCRIPTION_BACKEND=openai_api` en `.env`. |
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |
 | La 1.ª transcripción tarda mucho | Descarga el modelo Whisper (`small` ≈ 460 MB) una única vez; y en CPU `medium`/`large` son lentos. Usa `small` o `tiny`. |
 | Palabras técnicas mal transcritas | Es precisión de Whisper con audio de baja calidad. Sube a `--model medium`. |
-| El PDF usa otra tipografía | Si no está `C:\Windows\Fonts\arial.ttf`, usa Helvetica; el español se renderiza igual. |
+| `--keep-temp` no conserva nada / la GUI no abre | `--keep-temp` conserva `temp/` incluso en éxito (antes no tenía efecto; corregido). La GUI necesita `tkinter` (viene con Python estándar de python.org; no con todas las distribuciones). |
 
 Logs detallados: `logs/run_AAAAMMDD.log` (nunca contienen claves).
 
@@ -591,18 +673,28 @@ Logs detallados: `logs/run_AAAAMMDD.log` (nunca contienen claves).
 - **Transcripción local en CPU**: más lenta que con GPU. `small` es el compromiso recomendado.
 - **`faster-whisper` no disponible** en Python 3.13 → se usa `openai-whisper` (arrastra
   PyTorch, ~2 GB).
-- **Capa gratuita de Gemini**: tiene límites por minuto. La traducción va por lotes con
-  reintentos; aun así puedes toparte con el límite (el `.txt` se genera igual y el `.pdf` sale
-  degradado).
+- **Capa gratuita de Gemini**: tiene límites por minuto y sufre picos de sobrecarga (503)
+  ocasionales. La traducción va por lotes con reintentos y el análisis cae a
+  `GEMINI_FALLBACK_MODEL` si es necesario; aun así puedes toparte con el límite (el `.txt` se
+  genera igual y el `.html` sale degradado).
 - **API Whisper de OpenAI**: máximo 25 MB por archivo de audio.
 - **Nombres de modelo de IA cambian** con el tiempo; se resuelven con `AI_MODEL` / `--ai-model`
   (y autocorrección en Gemini).
 - **Calidad del análisis**: depende del proveedor y modelo; el sistema fuerza el idioma
   español y las reglas anti-alucinación, pero conviene revisar el resultado.
+- **`gui.py` no tiene tests automatizados**: requiere un display, y la CI (GitHub Actions) corre
+  headless. Si se toca, verificar a mano con `python main.py --gui`.
+- **OpenAI/DeepSeek existen pero nunca se han validado con una clave real** en este proyecto;
+  solo Gemini se usa y prueba de forma habitual.
 
 ---
 
-## 13. Cambios de esta sesión
+## 13. Historial de cambios
+
+Cada bloque es una sesión de trabajo real (con su fecha), de la más antigua a la más reciente.
+El commit exacto de cada una está en `git log --oneline`.
+
+### 2026-09-08/09 — Construcción inicial y publicación
 
 | Cambio | Archivos |
 |---|---|
@@ -613,5 +705,53 @@ Logs detallados: `logs/run_AAAAMMDD.log` (nunca contienen claves).
 | Silenciado un aviso ruidoso del SDK de Google. | `src/ai_providers/gemini_provider.py` |
 | Lectura del WAV con el módulo `wave` para no depender de un `ffmpeg.exe` en el PATH (el binario embebido tiene otro nombre). | `src/transcriber.py` |
 | 2 tests nuevos (degradación del análisis vs. propagación de `AIAuthError`). | `tests/test_ai_parser.py` |
+| Auditoría para repo público: `.env` fuera de Git, `LICENSE` (MIT), CI de pytest. **Publicado en GitHub.** | `.gitignore`, `.github/workflows/tests.yml`, `LICENSE` |
 
-Estado final: **86 tests en verde**, E2E real con Gemini verificado de extremo a extremo.
+Estado al cierre: 86 tests en verde, E2E real con Gemini verificado de extremo a extremo.
+
+### 2026-09-18 — Seguridad y robustez del proveedor Gemini
+
+| Cambio | Archivos |
+|---|---|
+| `--keep-temp` no tenía efecto (solo forzaba `KEEP_TEMP_ON_ERROR`, ya `true` por defecto). Se separó en dos flags independientes. | `src/utils.py::TempWorkspace`, `config.py`, `main.py` |
+| Timeout de red también para las llamadas a Gemini (`http_options` del SDK); antes podían colgarse indefinidamente. | `src/ai_providers/gemini_provider.py` |
+| `MAX_VIDEO_MB` se aplica también a la descarga de audio de TikTok (antes solo a `--file`), vía `max_filesize` de `yt-dlp`. | `src/tiktok_downloader.py` |
+| Guardas explícitas contra inyección de instrucciones ocultas en la transcripción (contenido de un vídeo de terceros, no confiable) en los *system prompts*. | `src/translator.py`, `src/ai_analyzer.py` |
+| Los fallos de traducción por segmento dejaron de silenciarse: se cuentan y se avisa al usuario. | `src/translator.py`, `src/pipeline.py` |
+| Regex de autocambio de modelo (`_MODEL_MOVED`) sensible a mayúsculas → `re.IGNORECASE`. | `src/ai_providers/gemini_provider.py` |
+| README: diagramas Mermaid de arquitectura/pipeline y sección de seguridad. | `README.md` |
+
+### 2026-09-20 (mañana) — Interfaz gráfica, indicaciones a la IA, y limpieza de docs
+
+| Cambio | Archivos |
+|---|---|
+| **Interfaz gráfica** (Tkinter, `python main.py --gui`): URL + indicaciones para la IA, procesamiento en hilo aparte, `messagebox` final con las rutas generadas. | `gui.py` (nuevo) |
+| **`user_instructions`**: indicaciones opcionales del usuario sobre qué priorizar en el informe, disponibles en CLI (`--instructions`), menú interactivo y GUI. | `src/ai_analyzer.py`, `src/pipeline.py`, `main.py`, `gui.py` |
+| Corregido el error de descarga `Unexpected response from webpage request`: faltaba `curl_cffi` (TikTok exige imitar el TLS de un navegador desde 2026). | `requirements.txt` |
+| `CLAUDE.md` (contexto para agentes de IA) se crea pero se saca del repositorio público (es local, no documentación de usuario); se elimina `INFORME_TECNICO.md` y el README queda como única doc pública. | `.gitignore`, `README.md` |
+
+### 2026-09-20 (tarde) — Resiliencia de Gemini ante sobrecarga (503)
+
+Motivo: un usuario reportó un informe degradado con `error 503 UNAVAILABLE` / "high demand" de
+Gemini, tras usar `gemini-3.6-flash`.
+
+| Cambio | Archivos |
+|---|---|
+| Nueva excepción `AIOverloadedError`: el 503/"high demand"/"overloaded" se clasifica aparte del error genérico y comparte el backoff creciente de un rate-limit (antes se agotaba en 2 reintentos con delay fijo). `max_retries` sube de 3 a 4. | `src/ai_providers/base.py`, `src/ai_providers/gemini_provider.py` |
+| **Fallback automático de modelo**: si tras agotar los reintentos sigue sobrecargado, se prueba una vez con `GEMINI_FALLBACK_MODEL` (por defecto `gemini-flash-lite-latest`, con más margen libre en el tier gratuito) antes de degradar el informe. | `config.py`, `src/ai_providers/__init__.py`, `src/ai_providers/gemini_provider.py` |
+
+### 2026-09-20 (noche) — PDF → HTML
+
+Motivo: pedido explícito para reducir el peso del informe y poder incluir gráficos/diagramas
+reales (ReportLab era muy limitado para eso).
+
+| Cambio | Archivos |
+|---|---|
+| `src/pdf_generator.py` (ReportLab) eliminado; nuevo `src/html_generator.py`: informe **HTML autónomo** (CSS/SVG *inline*, sin JS, sin peticiones externas), mismas 12 secciones A–L más un gráfico de barras de tecnologías y una insignia de dificultad. Todo el contenido pasa por `html.escape()` (anti-XSS). | `src/html_generator.py` (nuevo), `src/pdf_generator.py` (eliminado) |
+| `reportlab` fuera de `requirements.txt` y desinstalado del `.venv` (nada más dependía de él). | `requirements.txt` |
+| Renombrados consistentes: `ProcessingResult.pdf_path` → `html_path`, `Config.pdf_dir` → `html_dir` (`output/pdf/` → `output/html/`), `--no-pdf` → `--no-html`. | `src/models.py`, `config.py`, `main.py`, `src/pipeline.py` |
+| `gui.py`: ajuste mínimo (mismo diseño) para reflejar `.html` en el mensaje final. | `gui.py` |
+
+Estado al cierre de esta guía: **121 tests en verde**, HTML verificado con un parser (etiquetas
+balanceadas, sin `<script>`, gráfico SVG presente) al no haber navegador disponible en esa
+sesión para una verificación visual directa.
