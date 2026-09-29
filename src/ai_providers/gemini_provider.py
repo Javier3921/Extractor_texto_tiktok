@@ -48,9 +48,10 @@ class GeminiProvider(AIProvider):
         self._fallback_model = (fallback_model or "").strip()
 
     def complete(self, system: str, user: str, *, want_json: bool = False,
-                max_tokens: int = 4096) -> str:
+                max_tokens: int = 4096, json_schema: dict | None = None) -> str:
         try:
-            return super().complete(system, user, want_json=want_json, max_tokens=max_tokens)
+            return super().complete(system, user, want_json=want_json, max_tokens=max_tokens,
+                                    json_schema=json_schema)
         except AIOverloadedError:
             if not self._fallback_model or self._fallback_model == self.model:
                 raise
@@ -60,7 +61,8 @@ class GeminiProvider(AIProvider):
                 self.name, self.model, self._fallback_model,
             )
             self.model = self._fallback_model
-            return super().complete(system, user, want_json=want_json, max_tokens=max_tokens)
+            return super().complete(system, user, want_json=want_json, max_tokens=max_tokens,
+                                    json_schema=json_schema)
 
     def _complete_raw(self, system: str, user: str, want_json: bool, max_tokens: int,
                       _allow_model_switch: bool = True) -> str:

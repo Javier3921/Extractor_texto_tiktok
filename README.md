@@ -1,4 +1,4 @@
-# 🎬 Extractor_texto_tiktok
+# Extractor_texto_tiktok
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
@@ -6,29 +6,41 @@
   <img alt="Tests" src="https://github.com/Javier3921/Extractor_texto_tiktok/actions/workflows/tests.yml/badge.svg">
   <img alt="Whisper" src="https://img.shields.io/badge/Transcripci%C3%B3n-Whisper-8A2BE2">
   <img alt="Gemini" src="https://img.shields.io/badge/IA-Google%20Gemini-4285F4?logo=googlegemini&logoColor=white">
+  <img alt="Claude" src="https://img.shields.io/badge/IA-Claude%20Code-D97757?logo=claude&logoColor=white">
+  <img alt="Markdown" src="https://img.shields.io/badge/Informe-HTML%20%7C%20Markdown-000000?logo=markdown&logoColor=white">
   <img alt="Plataforma" src="https://img.shields.io/badge/Plataforma-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey">
 </p>
 
 Convierte un vídeo de **TikTok** (o un archivo de vídeo local) en un **informe
-técnico profesional en HTML, redactado íntegramente en español**, con
-gráficos y una insignia de dificultad. Úsalo desde la línea de comandos o
-desde una pequeña **interfaz gráfica** — solo pega el enlace y, si quieres,
-dile a la IA qué priorizar en el informe.
+técnico profesional redactado íntegramente en español**, en el formato que
+prefieras:
 
-> **🔒 Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
+- **HTML** — página autónoma con gráficos y una insignia de dificultad, para leerla tú.
+- **Markdown** — texto estructurado con metadatos YAML, ideal para pasárselo a
+  otra IA, guardarlo en tus notas o versionarlo en un repositorio.
+- **Ambos** a la vez.
+
+La traducción y el análisis los hace la IA que elijas: **Google Gemini** (capa
+gratuita con clave de API) o **Claude** a través del CLI de Claude Code (usa
+tu suscripción de Claude, sin clave de API), entre otras. Úsalo desde la línea
+de comandos o desde una pequeña **interfaz gráfica** — solo pega el enlace y,
+si quieres, dile a la IA qué priorizar en el informe.
+
+> **Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
 > se obtiene el **audio**, en un archivo temporal que se borra al terminar.
 
 ```mermaid
 flowchart TD
-    A(["🔗 URL de TikTok<br/>o 📁 archivo local"]) --> B["🎧 Obtener audio<br/><sub>yt-dlp · SOLO audio, nunca vídeo</sub>"]
-    B --> C["🎚️ Normalizar audio<br/><sub>FFmpeg → WAV 16 kHz mono</sub>"]
-    C --> D["📝 Transcribir<br/><sub>Whisper (local u API)</sub>"]
-    D --> E{"🌐 ¿Idioma<br/>original?"}
-    E -- Español --> G["📄 Generar .txt"]
-    E -- "Inglés / otro" --> F["🌍 Traducir al español<br/><sub>IA · conserva el original</sub>"]
+    A(["URL de TikTok<br/>o archivo local"]) --> B["Obtener audio<br/><sub>yt-dlp · SOLO audio, nunca vídeo</sub>"]
+    B --> C["Normalizar audio<br/><sub>FFmpeg → WAV 16 kHz mono</sub>"]
+    C --> D["Transcribir<br/><sub>Whisper (local u API)</sub>"]
+    D --> E{"¿Idioma<br/>original?"}
+    E -- Español --> G["Generar .txt"]
+    E -- "Inglés / otro" --> F["Traducir al español<br/><sub>IA · conserva el original</sub>"]
     F --> G
-    G --> H["🧠 Analizar contenido<br/><sub>IA · anti-alucinación</sub>"]
-    H --> I(["🌐 Informe .html<br/><sub>autónomo, con gráficos</sub>"])
+    G --> H["Analizar contenido<br/><sub>IA · anti-alucinación</sub>"]
+    H --> I(["Informe .html<br/><sub>autónomo, con gráficos</sub>"])
+    H --> J(["Informe .md<br/><sub>legible por otra IA</sub>"])
 
     classDef entrada fill:#4285F4,stroke:#1a56c4,color:#fff
     classDef proceso fill:#f4f6fb,stroke:#4285F4,color:#1a1a1a
@@ -37,7 +49,7 @@ flowchart TD
     class A entrada
     class B,C,D,G proceso
     class F,H ia
-    class I salida
+    class I,J salida
 ```
 
 ---
@@ -68,7 +80,7 @@ flowchart TD
 | **Sistema** | Windows 10/11 (también funciona en Linux/macOS con ajustes menores). |
 | **Python** | 3.11 o superior. Probado en 3.13. |
 | **FFmpeg** | Necesario para extraer el audio. Si no hay uno en el sistema, se usa automáticamente el que incluye el paquete `imageio-ffmpeg` (se instala con las dependencias). |
-| **Clave de IA** | Solo para traducción y análisis. **Gemini** tiene capa gratuita: https://aistudio.google.com/apikey |
+| **IA** | Para traducción y análisis, una de estas dos opciones: una clave de **Gemini** (capa gratuita: https://aistudio.google.com/apikey) **o** el [CLI de Claude Code](https://docs.claude.com/en/docs/claude-code) instalado y con sesión iniciada (sin clave de API; ver [Proveedores de IA](#proveedores-de-ia)). |
 | **Espacio en disco** | ~2–2,5 GB para PyTorch + Whisper (backend de transcripción local por defecto). El modelo `small` añade ~490 MB la primera vez. |
 
 ---
@@ -117,7 +129,8 @@ o descarga manual desde <https://www.gyan.dev/ffmpeg/builds/> y añade la carpet
 copy .env.example .env
 ```
 
-Edita `.env` y rellena la clave del proveedor que vayas a usar (ver abajo).
+Edita `.env`: elige el proveedor (`AI_PROVIDER`) y el formato del informe
+(`REPORT_FORMAT`), y rellena la clave del proveedor si la necesita (ver abajo).
 
 ---
 
@@ -125,9 +138,12 @@ Edita `.env` y rellena la clave del proveedor que vayas a usar (ver abajo).
 
 | Variable | Valores | Por defecto | Descripción |
 |---|---|---|---|
-| `AI_PROVIDER` | `openai` `gemini` `deepseek` `mock` | `gemini` | Proveedor para traducción y análisis. |
+| `AI_PROVIDER` | `openai` `gemini` `deepseek` `claude_cli` `mock` | `gemini` | Proveedor para traducción y análisis. |
 | `AI_MODEL` | texto | *(vacío)* | Modelo concreto. Vacío = modelo por defecto del proveedor. |
 | `GEMINI_FALLBACK_MODEL` | texto | `gemini-flash-lite-latest` | Solo Gemini: si el modelo principal se sobrecarga (503) y se agotan los reintentos, se prueba una vez con este antes de degradar el informe. Vacío = desactivado. |
+| `CLAUDE_CLI_CMD` | comando o ruta | `claude` | Solo `claude_cli`: ejecutable del CLI de Claude Code. |
+| `CLAUDE_CLI_TIMEOUT` | entero (s) | `600` | Solo `claude_cli`: tiempo máximo por llamada al CLI. |
+| `REPORT_FORMAT` | `html` `markdown` `both` | `html` | Formato del informe técnico. |
 | `OPENAI_API_KEY` | texto | — | Clave de OpenAI. |
 | `GEMINI_API_KEY` | texto | — | Clave de Google AI Studio (gratuita). |
 | `DEEPSEEK_API_KEY` | texto | — | Clave de DeepSeek. |
@@ -136,7 +152,7 @@ Edita `.env` y rellena la clave del proveedor que vayas a usar (ver abajo).
 | `OUTPUT_DIRECTORY` | ruta | `output` | Carpeta de resultados. |
 | `TEMP_DIRECTORY` | ruta | `temp` | Carpeta temporal. |
 | `LOGS_DIRECTORY` | ruta | `logs` | Carpeta de logs. |
-| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red para `yt-dlp` **y** para las llamadas al proveedor de IA. |
+| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red para `yt-dlp` **y** para las llamadas HTTP al proveedor de IA (`claude_cli` usa `CLAUDE_CLI_TIMEOUT`). |
 | `MAX_VIDEO_MB` | entero | `200` | Límite de tamaño para archivos locales **y** para el audio descargado de TikTok. |
 | `ALLOW_MOCK_FALLBACK` | `true`/`false` | `false` | Si el proveedor elegido no tiene clave, usar `mock` en vez de fallar. |
 | `KEEP_TEMP_ON_ERROR` | `true`/`false` | `true` | Conservar la carpeta temporal cuando un procesamiento falla (debug). |
@@ -162,8 +178,9 @@ python main.py
   2. Procesar múltiples TikToks (input/urls.txt)
   3. Procesar archivo de video local
   4. Cambiar proveedor de IA
-  5. Ver configuración
-  6. Salir
+  5. Cambiar formato del informe
+  6. Ver configuración
+  7. Salir
 ```
 
 ### Una URL
@@ -194,10 +211,11 @@ Formatos aceptados: `mp4, mov, mkv, webm, avi, m4v, flv` (y audio suelto:
 
 | Opción | Efecto |
 |---|---|
-| `--provider gemini\|openai\|deepseek\|mock` | Fuerza el proveedor de IA (ignora `.env`). |
+| `--provider gemini\|claude_cli\|openai\|deepseek\|mock` | Fuerza el proveedor de IA (ignora `.env`). |
 | `--ai-model NOMBRE` | Fuerza el modelo del proveedor de IA (ignora `AI_MODEL`). |
 | `--model small\|medium\|…` | Fuerza el modelo de Whisper. |
-| `--no-html` | Genera solo el `.txt`. |
+| `--format html\|markdown\|both` | Formato del informe (ignora `REPORT_FORMAT`). |
+| `--no-report` | Genera solo el `.txt` (alias antiguo: `--no-html`). |
 | `--keep-temp` | Conserva la carpeta temporal aunque el procesamiento termine bien (por defecto se borra en éxito). |
 | `--instructions "TEXTO"` | Indicaciones para la IA sobre qué priorizar o incluir en el informe (ver [más abajo](#instrucciones-personalizadas-para-la-ia)). |
 | `--config` | Muestra la configuración y sale. |
@@ -214,7 +232,13 @@ Progreso mostrado:
 [5/6] Traduciendo/analizando con IA...
 [INFO] Traduciendo contenido al español...
 [OK] Traducción completada.
-[6/6] Generando informe HTML...
+[6/6] Generando informe (MARKDOWN)...
+```
+
+Ejemplo con Claude y ambos formatos:
+
+```bat
+python main.py --url "https://www.tiktok.com/@u/video/123" --provider claude_cli --format both
 ```
 
 ### Interfaz gráfica
@@ -224,10 +248,12 @@ python main.py --gui
 ```
 
 Abre una ventana (Tkinter, sin dependencias adicionales) con un campo para la
-**URL de TikTok** y un cuadro de texto para **indicaciones a la IA** sobre qué
-priorizar en el informe. El procesamiento corre en segundo plano (no se
-congela la ventana) y, al terminar, muestra un mensaje con **dónde quedaron
-guardados el `.txt` y el `.html`, y con qué nombres**.
+**URL de TikTok**, un cuadro de texto para **indicaciones a la IA** sobre qué
+priorizar en el informe y dos desplegables para elegir **proveedor de IA** y
+**formato del informe** (parten de los valores del `.env`). El procesamiento
+corre en segundo plano (no se congela la ventana) y, al terminar, muestra un
+mensaje con **dónde quedaron guardados el `.txt` y el informe (`.html`/`.md`),
+y con qué nombres**.
 
 ### Instrucciones personalizadas para la IA
 
@@ -267,6 +293,7 @@ tecnologías, lenguajes, frameworks, librerías, APIs, productos ni herramientas
 | Proveedor | SDK | Coste | Notas |
 |---|---|---|---|
 | **Gemini** | `google-genai` | **Capa gratuita** | Recomendado para empezar. Clave: <https://aistudio.google.com/apikey> |
+| **Claude** (`claude_cli`) | CLI de Claude Code | Incluido en tu suscripción de Claude | Sin clave de API: usa la sesión del CLI ya iniciada en el equipo. Ver abajo. |
 | **OpenAI** | `openai` | De pago | Requiere facturación activa. |
 | **DeepSeek** | `openai` (con `base_url`) | De pago (bajo coste) | API compatible con OpenAI. |
 | **mock** | — | Gratis | Proveedor simulado: **no hace análisis real**. Para probar el pipeline sin claves. |
@@ -276,14 +303,31 @@ opción 4 del menú. La arquitectura (`src/ai_providers/`) está desacoplada:
 todos implementan la misma interfaz `AIProvider`.
 
 Modelos por defecto (si `AI_MODEL` está vacío): `gpt-4o-mini` (OpenAI),
-`gemini-3.6-flash` (Gemini), `deepseek-chat` (DeepSeek). Los proveedores retiran
+`gemini-3.6-flash` (Gemini), `sonnet` (Claude), `deepseek-chat` (DeepSeek). Los proveedores retiran
 modelos con el tiempo; si uno deja de funcionar, pon el nombre nuevo en
 `AI_MODEL` (o usa `--ai-model NOMBRE`). El proveedor Gemini además intenta
 **autocorregir** el modelo si la API indica el sustituto en el error.
 
 Si el análisis con IA falla (límite de cuota, modelo caído, red), el `.txt` con
-la transcripción se genera igualmente y el `.html` sale en modo degradado dejando
+la transcripción se genera igualmente y el informe sale en modo degradado dejando
 constancia del motivo, en vez de abortar todo el procesamiento.
+
+### Claude vía Claude Code (`claude_cli`)
+
+En lugar de una API de pago por token, este proveedor invoca el CLI de
+[Claude Code](https://docs.claude.com/en/docs/claude-code) en modo no
+interactivo (`claude -p`), aprovechando la sesión que ya tengas iniciada con
+tu cuenta de Claude.
+
+1. Instala el CLI (requiere Node.js): `npm install -g @anthropic-ai/claude-code`
+2. Ejecuta `claude` una vez en una terminal e inicia sesión.
+3. En `.env`: `AI_PROVIDER=claude_cli` (opcional: `AI_MODEL=opus`, `haiku`…).
+
+Cada llamada se lanza **sin herramientas** (`--tools ""`), con un *system
+prompt* propio (`--system-prompt`) y con la forma de la respuesta forzada por
+un esquema JSON (`--json-schema`); la transcripción se entrega por la entrada
+estándar. Es más lento que una llamada HTTP (unos segundos por petición) y
+consume de los límites de uso de tu plan.
 
 ---
 
@@ -296,12 +340,12 @@ Cambiar de proveedor de IA no requiere tocar el resto del programa (patrón
 
 ```mermaid
 flowchart LR
-    subgraph CLI["🖥️ Entrada"]
+    subgraph CLI["Entrada"]
         M["main.py<br/><sub>argparse + menú</sub>"]
         CFG["config.py<br/><sub>.env → Config</sub>"]
     end
 
-    subgraph PIPE["⚙️ src/pipeline.py — orquestador"]
+    subgraph PIPE["src/pipeline.py — orquestador"]
         direction TB
         S1["tiktok_downloader /<br/>local_video"]
         S2["audio_extractor<br/><sub>FFmpeg</sub>"]
@@ -309,23 +353,25 @@ flowchart LR
         S4["language_detector"]
         S5["translator"]
         S6["ai_analyzer"]
-        S7["txt_writer /<br/>html_generator"]
+        S7["txt_writer /<br/>html_generator /<br/>markdown_generator"]
         S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
     end
 
-    subgraph AI["🧩 src/ai_providers/ (Strategy)"]
+    subgraph AI["src/ai_providers/ (Strategy)"]
         BASE["base.py<br/><sub>AIProvider (ABC)<br/>reintentos + backoff</sub>"]
-        GEM["gemini_provider.py<br/><sub>✅ en uso — capa gratuita</sub>"]
+        GEM["gemini_provider.py<br/><sub>en uso — capa gratuita</sub>"]
+        CLA["claude_cli_provider.py<br/><sub>Claude Code CLI</sub>"]
         OAI["openai_provider.py"]
         DS["deepseek_provider.py"]
         MOCK["mock_provider.py<br/><sub>offline, para tests</sub>"]
         BASE -.-> GEM
+        BASE -.-> CLA
         BASE -.-> OAI
         BASE -.-> DS
         BASE -.-> MOCK
     end
 
-    UTILS["🛡️ utils.py<br/><sub>logging seguro · rutas seguras<br/>temp workspace · JSON tolerante</sub>"]
+    UTILS["utils.py<br/><sub>logging seguro · rutas seguras<br/>temp workspace · JSON tolerante</sub>"]
 
     M --> CFG --> PIPE
     S5 -.usa.-> AI
@@ -338,7 +384,7 @@ flowchart LR
     classDef util fill:#fff3cd,stroke:#b38600,color:#1a1a1a
     class M,CFG entrada
     class BASE,OAI,DS,MOCK ia
-    class GEM activo
+    class GEM,CLA activo
     class UTILS util
 ```
 
@@ -359,14 +405,16 @@ frentes:
 
 | Medida | Dónde | Por qué |
 |---|---|---|
-| 🔑 **Redacción de secretos en logs** | `utils.py::SecretFilter` | Las claves (`sk-…`, `AIza…`, `Bearer …`) se sustituyen por `[REDACTED]` en consola y archivo de log; `--config` solo muestra la clave enmascarada (`AIza…3456`). |
-| 🧱 **Anti *path traversal*** | `utils.py::safe_output_path` | Los nombres de archivo derivados de datos externos (título del vídeo, id) nunca pueden escribir fuera de `output/`. |
-| 🎯 **Solo contenido público** | `tiktok_downloader.py` | `yt-dlp` se usa sin cookies ni credenciales; nunca se intenta sortear un vídeo privado o con captcha. |
-| 📦 **Límite de tamaño de descarga** | `tiktok_downloader.py` / `local_video.py` | `MAX_VIDEO_MB` limita tanto los archivos locales como el audio descargado de TikTok (`max_filesize` de yt-dlp), evitando descargas desproporcionadas. |
-| ⏱️ **Timeout de red en la IA** | `ai_providers/gemini_provider.py` | Las llamadas a Gemini usan `NETWORK_TIMEOUT` del `.env`; sin esto, una llamada colgada bloquearía el pipeline indefinidamente. |
-| 🛑 **Guardas contra inyección de instrucciones** | `translator.py`, `ai_analyzer.py` | La transcripción es contenido de un tercero no confiable. Los *system prompts* indican explícitamente al modelo que ese texto es **dato a procesar, nunca una instrucción**, aunque contenga frases como "ignora tus reglas". |
-| 🗑️ **Sin persistencia del vídeo** | `tiktok_downloader.py`, `TempWorkspace` | Solo se guarda el audio, en una carpeta temporal por trabajo que se borra al terminar con éxito. |
-| 🙈 **`.env` fuera del repositorio** | `.gitignore` | Las claves de API, `logs/`, `temp/` y `output/` nunca se suben a Git. |
+| **Redacción de secretos en logs** | `utils.py::SecretFilter` | Las claves (`sk-…`, `AIza…`, `Bearer …`) se sustituyen por `[REDACTED]` en consola y archivo de log; `--config` solo muestra la clave enmascarada (`AIza…3456`). |
+| **Anti *path traversal*** | `utils.py::safe_output_path` | Los nombres de archivo derivados de datos externos (título del vídeo, id) nunca pueden escribir fuera de `output/`. |
+| **Solo contenido público** | `tiktok_downloader.py` | `yt-dlp` se usa sin cookies ni credenciales; nunca se intenta sortear un vídeo privado o con captcha. |
+| **Límite de tamaño de descarga** | `tiktok_downloader.py` / `local_video.py` | `MAX_VIDEO_MB` limita tanto los archivos locales como el audio descargado de TikTok (`max_filesize` de yt-dlp), evitando descargas desproporcionadas. |
+| **Timeout en las llamadas a la IA** | `ai_providers/gemini_provider.py`, `ai_providers/claude_cli_provider.py` | Las llamadas a Gemini usan `NETWORK_TIMEOUT` y las del CLI de Claude `CLAUDE_CLI_TIMEOUT` (`.env`); sin esto, una llamada colgada bloquearía el pipeline indefinidamente. |
+| **Guardas contra inyección de instrucciones** | `translator.py`, `ai_analyzer.py` | La transcripción es contenido de un tercero no confiable. Los *system prompts* indican explícitamente al modelo que ese texto es **dato a procesar, nunca una instrucción**, aunque contenga frases como "ignora tus reglas". |
+| **Claude sin herramientas** | `ai_providers/claude_cli_provider.py` | El CLI de Claude Code se invoca con `--tools ""` y fuera de la carpeta del proyecto: aunque una transcripción intentara dar órdenes, el modelo no tiene forma de ejecutar comandos ni leer archivos. |
+| **Markdown sin estructura inyectable** | `markdown_generator.py` | Los metadatos van como cadenas JSON en el bloque YAML y el texto se neutraliza (encabezados, separadores, `<`, `\|` en tablas) para que el contenido de un tercero no pueda falsear la estructura del documento. |
+| **Sin persistencia del vídeo** | `tiktok_downloader.py`, `TempWorkspace` | Solo se guarda el audio, en una carpeta temporal por trabajo que se borra al terminar con éxito. |
+| **`.env` fuera del repositorio** | `.gitignore` | Las claves de API, `logs/`, `temp/` y `output/` nunca se suben a Git. |
 
 ---
 
@@ -376,8 +424,10 @@ frentes:
 output/
 ├── txt/
 │   └── tiktok_<id>.txt           (o  local_<nombre>_<fecha>.txt)
-└── html/
-    └── reporte_tiktok_<id>.html  (o  reporte_local_<nombre>_<fecha>.html)
+├── html/                          (REPORT_FORMAT=html o both)
+│   └── reporte_tiktok_<id>.html  (o  reporte_local_<nombre>_<fecha>.html)
+└── markdown/                      (REPORT_FORMAT=markdown o both)
+    └── reporte_tiktok_<id>.md    (o  reporte_local_<nombre>_<fecha>.md)
 ```
 
 ### `.txt`
@@ -423,6 +473,31 @@ informe típico, frente a ~100 KB) y admite imprimirse o "Guardar como PDF"
 desde el navegador si aún necesitas un archivo PDF puntual (incluye estilos
 de impresión).
 
+### `.md`
+
+Las mismas 12 secciones (`## A. Resumen ejecutivo` … `## L. Conclusión`), sin
+estilos ni gráficos, precedidas de un bloque de metadatos YAML que otra IA o un
+script pueden leer directamente:
+
+```markdown
+---
+tipo: informe_tecnico_video
+titulo: "Construcción de una REST API con Python, FastAPI y Docker"
+origen: "https://www.tiktok.com/@u/video/123"
+idioma_original: "English"
+traducido_al_espanol: true
+duracion: "00:42"
+proveedor_ia: "claude_cli"
+modelo_ia: "sonnet"
+dificultad: "Básico"
+---
+
+# Construcción de una REST API con Python, FastAPI y Docker
+
+## A. Resumen ejecutivo
+...
+```
+
 El análisis distingue explícitamente **información explícita**,
 **inferencia técnica** y **recomendación**, y evita inventar tecnologías,
 arquitecturas o código que no estén en el contenido.
@@ -451,10 +526,11 @@ Extractor_texto_tiktok/
 │   ├── ai_analyzer.py      # análisis técnico -> JSON -> AnalysisReport
 │   ├── txt_writer.py       # generación del .txt
 │   ├── html_generator.py   # generación del .html (autónomo, sin dependencias)
+│   ├── markdown_generator.py # generación del .md (metadatos YAML + secciones)
 │   ├── utils.py            # logging seguro, rutas, JSON, FFmpeg, temp
-│   └── ai_providers/       # OpenAI / Gemini / DeepSeek / mock
+│   └── ai_providers/       # Gemini / Claude (CLI) / OpenAI / DeepSeek / mock
 ├── input/urls.txt
-├── output/{txt,html}/
+├── output/{txt,html,markdown}/
 ├── temp/  · logs/
 └── tests/
 ```
@@ -467,8 +543,9 @@ pytest -q
 ```
 
 Los tests usan mocks: **no** hacen descargas reales de TikTok ni llamadas reales
-a APIs, y no necesitan PyTorch. Incluyen la clasificación de errores y el
-autocambio de modelo del proveedor Gemini.
+a APIs (ni al CLI de Claude), y no necesitan PyTorch. Incluyen la
+clasificación de errores y el autocambio de modelo del proveedor Gemini, y la
+invocación y clasificación de errores del proveedor `claude_cli`.
 
 ---
 
@@ -501,6 +578,9 @@ pero es de pago y limita a 25 MB por archivo de audio.
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |
 | `Falta la clave de API para gemini` | Rellena `GEMINI_API_KEY` en `.env` o usa `--provider mock`. |
 | Informe degradado con `error 503 UNAVAILABLE` / `high demand` | La capa gratuita de Gemini está saturada por demanda alta (temporal, no es un problema de configuración). El sistema ya reintenta con espera creciente y, si el modelo principal sigue sobrecargado, cae automáticamente a `GEMINI_FALLBACK_MODEL` (por defecto `gemini-flash-lite-latest`, con más margen libre). Si aun así falla, espera unos minutos y reprocesa el mismo video (el `.txt` no se pierde). |
+| `No se encontro el CLI de Claude Code` | Instala el CLI (`npm install -g @anthropic-ai/claude-code`) o pon su ruta completa en `CLAUDE_CLI_CMD`. |
+| `el CLI de Claude Code no tiene una sesion valida` | Ejecuta `claude` en una terminal e inicia sesión con tu cuenta. |
+| Informe degradado con `limite de uso de Claude alcanzado` | Se agotó el cupo de tu plan de Claude por ahora. Espera a que se renueve o usa otro proveedor (`--provider gemini`); el `.txt` no se pierde. |
 | La 1.ª transcripción tarda | Descarga el modelo Whisper (`small` ≈ 490 MB). Solo la primera vez. |
 
 Los logs detallados están en `logs/run_AAAAMMDD.log`.
@@ -517,6 +597,9 @@ Los logs detallados están en `logs/run_AAAAMMDD.log`.
 - **Capa gratuita de Gemini:** tiene límites de peticiones. Para transcripciones
   largas, la traducción se hace por lotes y con reintentos, pero puedes toparte
   con el límite.
+- **Claude vía CLI (`claude_cli`):** cada llamada lanza un proceso del CLI
+  (unos 5–10 s) y consume de los límites de uso de tu plan de Claude; si se
+  agotan, el `.txt` se genera igual y el informe sale en modo degradado.
 - **Calidad de la traducción/análisis:** depende del proveedor y modelo elegidos.
 - El backend `openai_api` de transcripción no admite audios de más de 25 MB.
 

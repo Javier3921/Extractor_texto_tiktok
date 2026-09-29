@@ -1,7 +1,8 @@
 """Orquestador del pipeline completo (6 etapas).
 
 URL/archivo -> audio -> Whisper -> transcripcion -> deteccion de idioma ->
-traduccion al espanol (si procede) -> TXT -> analisis IA -> HTML.
+traduccion al espanol (si procede) -> TXT -> analisis IA -> informe
+HTML y/o Markdown (segun REPORT_FORMAT / --format).
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from src.audio_extractor import extract_audio, probe_duration
 from src.html_generator import build_html
 from src.language_detector import detect_language
 from src.local_video import validate_local_media
+from src.markdown_generator import build_markdown
 from src.models import ProcessingResult, Transcript
 from src.tiktok_downloader import fetch_audio
 from src.transcriber import transcribe
@@ -41,20 +43,20 @@ def _ok(msg: str) -> None:
     print(f"[OK] {msg}")
 
 
-def process_url(url: str, cfg: Config, *, make_html: bool = True,
+def process_url(url: str, cfg: Config, *, make_report: bool = True,
                 user_instructions: str = "") -> ProcessingResult:
-    return _process(kind="url", ref=url, cfg=cfg, make_html=make_html,
+    return _process(kind="url", ref=url, cfg=cfg, make_report=make_report,
                     user_instructions=user_instructions)
 
 
-def process_file(path: str, cfg: Config, *, make_html: bool = True,
+def process_file(path: str, cfg: Config, *, make_report: bool = True,
                  user_instructions: str = "") -> ProcessingResult:
-    return _process(kind="file", ref=path, cfg=cfg, make_html=make_html,
+    return _process(kind="file", ref=path, cfg=cfg, make_report=make_report,
                     user_instructions=user_instructions)
 
 
 # --------------------------------------------------------------------------
-def _process(*, kind: str, ref: str, cfg: Config, make_html: bool,
+def _process(*, kind: str, ref: str, cfg: Config, make_report: bool,
             user_instructions: str = "") -> ProcessingResult:
     started = time.time()
     provider_name = cfg.resolved_provider()
@@ -177,19 +179,22 @@ def _process(*, kind: str, ref: str, cfg: Config, make_html: bool,
                 user_instructions=user_instructions,
             )
 
-            # -- 6. HTML ---------------------------------------------
-            if make_html:
-                _step(6, "Generando informe HTML...")
-                html_path = build_html(
-                    report, html_dir=cfg.html_dir, video_id=vid,
-                    url=url_for_report, original_language=language.name,
+            # -- 6. Informe (HTML y/o Markdown) -----------------------
+            formats = cfg.report_formats()
+            if make_report:
+                _step(6, f"Generando informe ({' + '.join(f.upper() for f in formats)})...")
+                common = dict(
+                    video_id=vid, url=url_for_report, original_language=language.name,
                     translated=tr.translated, provider=provider.name,
-                    ai_model=cfg.effective_ai_model(),
+                    ai_model=provider.model,
                     duration_str=format_timestamp(transcript.duration),
                 )
-                result.html_path = str(html_path)
+                if "html" in formats:
+                    result.html_path = str(build_html(report, html_dir=cfg.html_dir, **common))
+                if "markdown" in formats:
+                    result.md_path = str(build_markdown(report, md_dir=cfg.md_dir, **common))
             else:
-                _step(6, "Informe HTML omitido (--no-html).")
+                _step(6, "Informe omitido (--no-report).")
 
             result.ok = True
             ws.mark_ok()
@@ -216,6 +221,9 @@ def _print_summary(r: ProcessingResult) -> None:
         if r.html_path:
             print("Informe HTML:")
             print(f"  {r.html_path}")
+        if r.md_path:
+            print("Informe Markdown:")
+            print(f"  {r.md_path}")
     else:
         print(f"[ERROR] No se pudo completar el procesamiento de: {r.source_ref}")
         print(f"        {r.error}")

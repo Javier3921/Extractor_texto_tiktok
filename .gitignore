@@ -23,6 +23,7 @@ logs/
 *.log
 output/txt/
 output/html/
+output/markdown/
 output/pdf/
 
 # --- Medios de prueba ---

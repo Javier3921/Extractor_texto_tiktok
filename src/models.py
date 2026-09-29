@@ -105,6 +105,7 @@ class ProcessingResult:
     translated: bool = False
     txt_path: Optional[str] = None
     html_path: Optional[str] = None
+    md_path: Optional[str] = None
     duration: float = 0.0
     provider: str = ""
     ai_model: str = ""

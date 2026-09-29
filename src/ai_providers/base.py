@@ -37,6 +37,9 @@ class AIProvider(abc.ABC):
     name: str = "base"
     max_retries: int = 4
     retry_base_delay: float = 4.0
+    # True si `_complete_raw` acepta el kwarg `json_schema` (salida estructurada
+    # forzada). Los que no lo soportan reciben la firma original sin cambios.
+    supports_json_schema: bool = False
 
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
@@ -48,12 +51,18 @@ class AIProvider(abc.ABC):
         """Implementacion concreta de cada proveedor. Devuelve el texto de la respuesta."""
 
     def complete(self, system: str, user: str, *, want_json: bool = False,
-                 max_tokens: int = 4096) -> str:
-        """Llama al modelo con reintentos ante rate-limit / errores transitorios."""
+                 max_tokens: int = 4096, json_schema: dict | None = None) -> str:
+        """Llama al modelo con reintentos ante rate-limit / errores transitorios.
+
+        `json_schema` (opcional) describe la forma exacta del JSON esperado; solo
+        lo usan los proveedores con `supports_json_schema` (el resto lo ignora y
+        se guia por las instrucciones del prompt).
+        """
+        extra = {"json_schema": json_schema} if self.supports_json_schema else {}
         last_err: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                return self._complete_raw(system, user, want_json, max_tokens)
+                return self._complete_raw(system, user, want_json, max_tokens, **extra)
             except AIAuthError:
                 raise
             except (AIRateLimitError, AIOverloadedError) as e:
@@ -77,9 +86,11 @@ class AIProvider(abc.ABC):
         raise last_err if isinstance(last_err, AIProviderError) else \
             AIProviderError(f"{self.name}: fallo tras {self.max_retries} intentos: {last_err}")
 
-    def complete_json(self, system: str, user: str, *, max_tokens: int = 4096) -> Any:
+    def complete_json(self, system: str, user: str, *, max_tokens: int = 4096,
+                      json_schema: dict | None = None) -> Any:
         """Como complete() pero exige y parsea una respuesta JSON."""
-        text = self.complete(system, user, want_json=True, max_tokens=max_tokens)
+        text = self.complete(system, user, want_json=True, max_tokens=max_tokens,
+                             json_schema=json_schema)
         return extract_json(text)
 
     def describe(self) -> str:

@@ -33,11 +33,19 @@ produce:
 
 - un archivo **`.txt`** con la información del vídeo + la transcripción original + la traducción
   al español, y
-- un **informe técnico `.html`** autónomo (sin dependencias, con gráficos SVG),
-  **redactado íntegramente en español**, generado por una IA que analiza el contenido. Hasta
-  septiembre de 2026 este informe se generaba en `.pdf` con ReportLab; se sustituyó por HTML
-  (ver [sección 13](#13-historial-de-cambios)) porque pesa una fracción de lo mismo y permite
-  gráficos reales.
+- un **informe técnico** **redactado íntegramente en español**, generado por una IA que analiza
+  el contenido, en el formato elegido con `REPORT_FORMAT` / `--format`:
+  - **`.html`** autónomo (sin dependencias, con gráficos SVG), para leerlo una persona;
+  - **`.md`** (Markdown con metadatos YAML), pensado para pasárselo a otra IA o guardarlo en
+    notas/repositorios;
+  - o **ambos** (`both`).
+
+  Hasta septiembre de 2026 este informe se generaba en `.pdf` con ReportLab; se sustituyó por
+  HTML y después se añadió Markdown (ver [sección 13](#13-historial-de-cambios)).
+
+La IA que traduce y analiza es intercambiable: **Gemini** (clave de API, capa gratuita),
+**Claude vía el CLI de Claude Code** (`claude_cli`, usa la suscripción de Claude sin clave de
+API), OpenAI, DeepSeek o `mock`.
 
 Opcionalmente, el usuario puede darle **indicaciones a la IA** (`--instructions`, el menú o la
 GUI) sobre qué priorizar en el informe.
@@ -70,7 +78,8 @@ Ubicación del proyecto (ajusta la ruta a donde lo tengas):
    [5b] análisis técnico con IA   (JSON con 12 apartados; reglas anti-alucinación;
           │                        admite instrucciones opcionales del usuario)
           │
-   [6] generar  output/html/reporte_<id>.html   (secciones A–L + gráficos, en español)
+   [6] generar  output/html/reporte_<id>.html   y/o  output/markdown/reporte_<id>.md
+                  (secciones A–L en español; según REPORT_FORMAT: html | markdown | both)
 ```
 
 **Nunca se descarga ni se guarda el vídeo.** Solo se obtiene la pista de audio, de forma
@@ -79,11 +88,12 @@ temporal, y se borra al terminar (ver [sección 9](#9-dónde-queda-el-audio-del-
 ### Tres formas de usarlo
 
 1. **CLI directa**: `python main.py --url "..."` (o `--file`), con flags como `--provider`,
-   `--ai-model`, `--instructions`, `--no-html`.
+   `--ai-model`, `--format`, `--instructions`, `--no-report`.
 2. **Menú interactivo**: `python main.py` sin argumentos.
 3. **Interfaz gráfica** (Tkinter, sin dependencias nuevas): `python main.py --gui`. Pide la URL
-   y, opcionalmente, indicaciones para la IA; procesa en un hilo aparte (no congela la ventana)
-   y al terminar muestra en un `messagebox` dónde quedaron el `.txt` y el `.html`.
+   y, opcionalmente, indicaciones para la IA; permite elegir proveedor y formato del informe;
+   procesa en un hilo aparte (no congela la ventana) y al terminar muestra en un `messagebox`
+   dónde quedaron el `.txt` y el `.html`/`.md`.
 
 Las tres llaman al mismo `src/pipeline.py::process_url` / `process_file`; ninguna duplica lógica.
 
@@ -150,7 +160,7 @@ Se inspeccionó el entorno de la máquina:
     original con ReportLab (ver [sección 13](#13-historial-de-cambios)).
 14. `src/pipeline.py` (orquestador de las 6 etapas) + `main.py` (CLI + menú interactivo) +
     `gui.py` (interfaz gráfica, Tkinter).
-15. `tests/` (121 tests con `pytest`, todos con mocks; sin red ni torch ni display).
+15. `tests/` (143 tests con `pytest`, todos con mocks; sin red ni torch ni display).
 16. Documentación (`README.md`, `CLAUDE.md` local y esta guía).
 
 ### 2.4. Incidencia resuelta durante las pruebas
@@ -197,7 +207,7 @@ Resumen breve; el detalle completo (con qué se probó) está en la
 
 ```
 Extractor_texto_tiktok/
-├── main.py                     # CLI (argparse) + menú interactivo de 6 opciones
+├── main.py                     # CLI (argparse) + menú interactivo de 7 opciones
 ├── gui.py                      # interfaz grafica (Tkinter), python main.py --gui
 ├── config.py                   # Config (dataclass) desde .env: validación, rutas, claves enmascaradas
 ├── requirements.txt            # dependencias
@@ -221,6 +231,7 @@ Extractor_texto_tiktok/
 │   ├── txt_writer.py           # build_txt / write_txt: formato exacto del .txt
 │   ├── html_generator.py       # build_html: HTML autónomo (CSS/SVG inline, sin JS), A–L +
 │   │                           #   gráfico de tecnologías + insignia de dificultad
+│   ├── markdown_generator.py   # build_markdown: front matter YAML + secciones A–L (para IA)
 │   ├── utils.py                # logging+SecretFilter, sanitize_filename, safe_output_path,
 │   │                           #   extract_video_id, format_timestamp, extract_json,
 │   │                           #   resolve_ffmpeg, TempWorkspace, read_urls_file
@@ -231,23 +242,25 @@ Extractor_texto_tiktok/
 │       ├── openai_provider.py  # SDK openai; response_format JSON
 │       ├── gemini_provider.py  # SDK google-genai; autocorrección de modelo retirado; timeout de
 │       │                       #   red; fallback a GEMINI_FALLBACK_MODEL si se sobrecarga (503)
+│       ├── claude_cli_provider.py # Claude vía CLI de Claude Code (`claude -p`): sin clave,
+│       │                       #   --system-prompt, --json-schema, --tools ""; stdin
 │       ├── deepseek_provider.py# = OpenAIProvider con base_url de DeepSeek
 │       └── mock_provider.py    # respuestas deterministas offline (tests / sin clave)
 │
 ├── input/urls.txt              # una URL por línea (para procesar en lote)
-├── output/txt/  ·  output/html/ # resultados
+├── output/txt/ · html/ · markdown/ # resultados
 ├── temp/                       # carpetas de trabajo temporales (se borran al terminar)
 ├── logs/                       # logs diarios (sin secretos)
-└── tests/                      # 121 tests pytest
+└── tests/                      # 143 tests pytest
 ```
 
 ### Responsabilidad de cada archivo
 
 | Archivo | Qué hace |
 |---|---|
-| `main.py` | Analiza argumentos; si no hay, muestra el menú de 6 opciones. Carga `Config`, aplica overrides de CLI, arranca el logging y llama al `pipeline`. Con `--gui` delega en `gui.py` en vez de la CLI. |
-| `gui.py` | Ventana Tkinter (stdlib): URL + cuadro de indicaciones para la IA + botón. Corre `process_url` en un hilo aparte (no congela la ventana) y muestra el resultado (rutas de `.txt`/`.html`) en un `messagebox`. Sin tests automatizados (requiere display). |
-| `config.py` | `Config.load()` lee `.env` + variables de entorno, valida (`AI_PROVIDER`, backend, modelo Whisper), crea carpetas, y enmascara las claves para mostrarlas. `DEFAULT_AI_MODELS` define el modelo por defecto de cada proveedor; `gemini_fallback_model` (`GEMINI_FALLBACK_MODEL`) el modelo de reserva de Gemini. |
+| `main.py` | Analiza argumentos; si no hay, muestra el menú de 7 opciones (incluye cambiar proveedor y formato del informe para la sesión). Carga `Config`, aplica overrides de CLI, arranca el logging y llama al `pipeline`. Con `--gui` delega en `gui.py` en vez de la CLI. |
+| `gui.py` | Ventana Tkinter (stdlib): URL + cuadro de indicaciones para la IA + desplegables de proveedor y formato + botón. Corre `process_url` en un hilo aparte (no congela la ventana) y muestra el resultado (rutas de `.txt`/`.html`/`.md`) en un `messagebox`. Sin tests automatizados (requiere display). |
+| `config.py` | `Config.load()` lee `.env` + variables de entorno, valida (`AI_PROVIDER`, `REPORT_FORMAT`, backend, modelo Whisper), crea carpetas, y enmascara las claves para mostrarlas. `DEFAULT_AI_MODELS` define el modelo por defecto de cada proveedor; `gemini_fallback_model` (`GEMINI_FALLBACK_MODEL`) el modelo de reserva de Gemini; `claude_cli_cmd`/`claude_cli_timeout` el ejecutable y el timeout del CLI de Claude; `report_formats()` traduce `REPORT_FORMAT` a la tupla de formatos a generar. `claude_cli` y `mock` no necesitan clave. |
 | `src/pipeline.py` | Ejecuta las 6 etapas en orden, imprime `[1/6]…[6/6]` y los `[INFO]/[OK]`, gestiona la carpeta temporal (`TempWorkspace`) y devuelve un `ProcessingResult` con rutas y errores. |
 | `src/tiktok_downloader.py` | `validate_url` (http/https + host), `is_tiktok_url` (dominios de TikTok), `fetch_audio(url, workdir)` con `yt-dlp` `format="bestaudio/best"`; mapea los errores de yt-dlp a mensajes claros (privado, geobloqueo, 403/rate-limit, no encontrado). No usa cookies ni login. |
 | `src/local_video.py` | Comprueba que el archivo existe y que la extensión está soportada (`mp4, mov, mkv, webm, avi, m4v, flv` y audio suelto: `mp3, wav, m4a, aac, ogg, flac`). |
@@ -258,9 +271,11 @@ Extractor_texto_tiktok/
 | `src/ai_analyzer.py` | Construye el prompt (transcripción ES como contenido principal + original para verificar términos + instrucciones opcionales del usuario) con reglas anti-alucinación (distinguir *información explícita* / *inferencia* / *recomendación*; no inventar) y una guarda explícita contra instrucciones ocultas en la transcripción (contenido de terceros no confiable). Pide JSON, lo valida/repara → `AnalysisReport`. Si el JSON es irrecuperable → informe de reserva. Si el proveedor falla (no-auth) → informe degradado (no rompe el pipeline). |
 | `src/txt_writer.py` | Genera el `.txt` con el formato exacto: bloque `INFORMACION DEL VIDEO`, luego `TRANSCRIPCION ORIGINAL` (solo si hubo traducción) y `TRANSCRIPCION EN ESPANOL`, con líneas `[mm:ss] texto`. UTF-8. |
 | `src/html_generator.py` | `build_html()`: un único archivo HTML con CSS y SVG *inline*, sin JavaScript ni peticiones externas. Secciones **A–L**, tabla + gráfico de barras SVG de tecnologías por categoría, insignia de color para la dificultad, estilos `@media print`. Todo el contenido pasa por `html.escape()` antes de insertarse (el contenido viene en última instancia de un vídeo de terceros). |
+| `src/markdown_generator.py` | `build_markdown()`: mismo contenido y secciones **A–L** que el HTML, sin estilos, con un bloque YAML inicial de metadatos (título, origen, idioma, traducción, duración, proveedor/modelo, dificultad) pensado para que otra IA lo lea. Los valores YAML se serializan como cadenas JSON y el texto neutraliza encabezados, separadores, `<` y `|` en tablas, para que el contenido de terceros no pueda falsear la estructura. |
 | `src/utils.py` | Utilidades transversales: logging a `logs/run_AAAAMMDD.log` con `SecretFilter` (redacta claves), `sanitize_filename`, `safe_output_path` (anti path-traversal), `extract_video_id`, `format_timestamp`, `extract_json` (tolera ```` ``` ````, texto alrededor, JSON truncado), `resolve_ffmpeg`, `TempWorkspace` (borra la carpeta al salir con éxito **solo si se llamó a `mark_ok()`**; `always_keep`/`keep_on_error` son flags independientes), `read_urls_file`. |
-| `src/ai_providers/base.py` | `AIProvider` (ABC). `complete()` con reintentos y backoff ante rate-limit/sobrecarga/errores transitorios (`max_retries=4`); `complete_json()` usa `extract_json`. Excepciones: `AIProviderError`, `AIAuthError` (nunca se reintenta), `AIRateLimitError`, `AIOverloadedError` (503/alta demanda; mismo backoff creciente que el rate-limit). |
+| `src/ai_providers/base.py` | `AIProvider` (ABC). `complete()` con reintentos y backoff ante rate-limit/sobrecarga/errores transitorios (`max_retries=4`); `complete_json()` usa `extract_json`. Ambos aceptan un `json_schema` opcional que solo reciben los proveedores con `supports_json_schema = True` (hoy `claude_cli`); traductor y analizador definen su esquema. Excepciones: `AIProviderError`, `AIAuthError` (nunca se reintenta), `AIRateLimitError`, `AIOverloadedError` (503/alta demanda; mismo backoff creciente que el rate-limit). |
 | `src/ai_providers/gemini_provider.py` | SDK `google-genai`. Mapea 401/403 → `AIAuthError`, 429/quota → `AIRateLimitError`, 503/"high demand" → `AIOverloadedError`, 404 modelo retirado → **cambia al modelo que indica la API y reintenta** (regex case-insensitive). `complete()` está sobreescrito: si tras agotar los reintentos sigue sobrecargado, prueba una vez con `GEMINI_FALLBACK_MODEL` antes de rendirse. Recibe también `timeout` (→ `http_options` del SDK, evita que una llamada colgada bloquee el pipeline). |
+| `src/ai_providers/claude_cli_provider.py` | Invoca el CLI de Claude Code (`claude -p`) con la sesión ya iniciada en el equipo (sin `ANTHROPIC_API_KEY`). Contenido por stdin; `--system-prompt` propio; `--json-schema` para forzar la salida estructurada (sin él, `claude -p` responde en prosa/Markdown); `--tools ""` (sin herramientas: una inyección en la transcripción no puede ejecutar nada); cwd = carpeta temporal del sistema (no carga el `CLAUDE.md` del proyecto). En Windows localiza el `claude.exe` real detrás del shim `claude.cmd` de npm, porque `cmd.exe /c` corrompe los argumentos con saltos de línea. Clasifica: sin sesión → `AIAuthError`, límite de uso → `AIRateLimitError`, sobrecarga → `AIOverloadedError`. Timeout propio (`CLAUDE_CLI_TIMEOUT`, por defecto 600 s). |
 | `src/ai_providers/openai_provider.py` / `deepseek_provider.py` | SDK `openai`; DeepSeek = la misma clase con `base_url="https://api.deepseek.com"`. |
 | `src/ai_providers/mock_provider.py` | Proveedor simulado: traducción "de marcador" (conserva términos técnicos) y un `AnalysisReport` JSON válido derivado del texto. Se usa con `--provider mock` o `AI_PROVIDER=mock`. |
 
@@ -273,7 +288,7 @@ Extractor_texto_tiktok/
   translated_to_spanish, executive_summary, detailed_explanation, technologies[],
   technical_concepts[], architecture, code_analysis, best_practices[], risks[],
   recommendations[], difficulty, applications[], conclusion` (+ `parse_warning` interno).
-- `ProcessingResult` — id, rutas de TXT/HTML, idioma, si hubo traducción, proveedor/modelo,
+- `ProcessingResult` — id, rutas de TXT/HTML/MD, idioma, si hubo traducción, proveedor/modelo,
   error y tiempo.
 
 ---
@@ -285,7 +300,7 @@ Extractor_texto_tiktok/
 | SO | Windows 10/11 (probado en Windows 11). |
 | Python | 3.11+ (probado en **3.13.7** de python.org). |
 | FFmpeg | Opcional: si no hay uno del sistema, se usa el de `imageio-ffmpeg` (viene con las dependencias). |
-| Clave de IA | Solo para traducción/análisis. **Gemini** tiene capa gratuita. |
+| IA | Para traducción/análisis: clave de **Gemini** (capa gratuita) **o** el CLI de Claude Code instalado (`npm install -g @anthropic-ai/claude-code`) y con sesión iniciada. |
 | Disco | ~2–2,5 GB para PyTorch + Whisper; el modelo `small` añade ~460 MB la primera vez. |
 | Red | Para instalar dependencias, descargar el modelo Whisper la 1ª vez y llamar a la IA. |
 
@@ -346,9 +361,12 @@ Copia `.env.example` a `.env` y rellena lo que necesites. Variables:
 
 | Variable | Valores | Por defecto | Para qué |
 |---|---|---|---|
-| `AI_PROVIDER` | `gemini` `openai` `deepseek` `mock` | `gemini` | Proveedor de traducción + análisis. |
+| `AI_PROVIDER` | `gemini` `claude_cli` `openai` `deepseek` `mock` | `gemini` | Proveedor de traducción + análisis. |
 | `AI_MODEL` | texto | *(vacío)* | Modelo concreto. Vacío = el por defecto del proveedor. |
 | `GEMINI_FALLBACK_MODEL` | texto | `gemini-flash-lite-latest` | Solo Gemini: si el modelo principal se sobrecarga (503) y se agotan los reintentos, se prueba una vez con este. Vacío = desactivado. |
+| `CLAUDE_CLI_CMD` | comando o ruta | `claude` | Solo `claude_cli`: ejecutable del CLI de Claude Code. |
+| `CLAUDE_CLI_TIMEOUT` | entero (s) | `600` | Solo `claude_cli`: tiempo máximo por llamada al CLI. |
+| `REPORT_FORMAT` | `html` `markdown` `both` | `html` | Formato del informe técnico. |
 | `OPENAI_API_KEY` | texto | — | Clave de OpenAI. |
 | `GEMINI_API_KEY` | texto | — | Clave de Google AI Studio (gratuita). |
 | `DEEPSEEK_API_KEY` | texto | — | Clave de DeepSeek. |
@@ -357,7 +375,7 @@ Copia `.env.example` a `.env` y rellena lo que necesites. Variables:
 | `OUTPUT_DIRECTORY` | ruta | `output` | Carpeta de resultados. |
 | `TEMP_DIRECTORY` | ruta | `temp` | Carpeta temporal. |
 | `LOGS_DIRECTORY` | ruta | `logs` | Carpeta de logs. |
-| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red de `yt-dlp` **y** de las llamadas al proveedor de IA. |
+| `NETWORK_TIMEOUT` | entero (s) | `30` | Timeout de red de `yt-dlp` **y** de las llamadas HTTP al proveedor de IA (`claude_cli` usa `CLAUDE_CLI_TIMEOUT`). |
 | `MAX_VIDEO_MB` | entero | `200` | Límite de tamaño para archivos locales **y** para el audio descargado de TikTok. |
 | `ALLOW_MOCK_FALLBACK` | `true`/`false` | `false` | Si el proveedor elegido no tiene clave, usar `mock` en vez de fallar. |
 | `KEEP_TEMP_ON_ERROR` | `true`/`false` | `true` | Conservar `temp/job_<id>/` cuando un procesamiento **falla** (para depurar). Independiente de `--keep-temp` (CLI), que conserva la carpeta **siempre**, incluso en éxito. |
@@ -372,6 +390,13 @@ Copia `.env.example` a `.env` y rellena lo que necesites. Variables:
    GEMINI_API_KEY=el_valor_que_copiaste
    ```
 4. No hace falta activar facturación; la capa gratuita funciona con límites por minuto.
+
+### Usar Claude (sin clave de API)
+
+1. Instala el CLI de Claude Code (requiere Node.js): `npm install -g @anthropic-ai/claude-code`.
+2. Ejecuta `claude` una vez en una terminal e inicia sesión con tu cuenta.
+3. En `.env`: `AI_PROVIDER=claude_cli` (modelo por defecto `sonnet`; `AI_MODEL=opus`/`haiku`
+   para cambiarlo). Consume de los límites de uso de tu plan de Claude.
 
 ---
 
@@ -391,8 +416,9 @@ python main.py
 2. Procesar múltiples TikToks (input/urls.txt)
 3. Procesar archivo de video local
 4. Cambiar proveedor de IA           (solo para la sesión actual)
-5. Ver configuración
-6. Salir
+5. Cambiar formato del informe      (solo para la sesión actual)
+6. Ver configuración
+7. Salir
 ```
 
 ### Interfaz gráfica
@@ -445,10 +471,20 @@ python main.py --urls-file "C:\ruta\mis_urls.txt"
 
 ```bat
 python main.py --file "C:\Videos\clip.mp4" --provider gemini
+python main.py --file "C:\Videos\clip.mp4" --provider claude_cli
+python main.py --file "C:\Videos\clip.mp4" --provider claude_cli --ai-model opus
 python main.py --file "C:\Videos\clip.mp4" --provider openai --ai-model gpt-4o-mini
 python main.py --file "C:\Videos\clip.mp4" --provider deepseek --ai-model deepseek-chat
 python main.py --file "C:\Videos\clip.mp4" --provider mock          (sin coste, análisis simulado)
 python main.py --url "..." --ai-model gemini-flash-latest
+```
+
+### Elegir el formato del informe (sin tocar `.env`)
+
+```bat
+python main.py --url "..." --format html        # solo HTML
+python main.py --url "..." --format markdown    # solo Markdown
+python main.py --url "..." --format both        # los dos
 ```
 
 ### Forzar el modelo de Whisper
@@ -461,7 +497,7 @@ python main.py --url "..." --model tiny
 ### Otras opciones
 
 ```bat
-python main.py --file "C:\Videos\clip.mp4" --no-html     # genera solo el .txt
+python main.py --file "C:\Videos\clip.mp4" --no-report   # genera solo el .txt (alias: --no-html)
 python main.py --file "C:\Videos\clip.mp4" --keep-temp   # no borra temp/ aunque todo vaya bien
 python main.py --config                                  # muestra la configuración y sale
 python main.py --help                                    # ayuda de argparse
@@ -474,7 +510,10 @@ python main.py --help                                    # ayuda de argparse
 python main.py --url "https://www.tiktok.com/@u/video/123..."
 
 :: Lote nocturno, solo TXT, modelo rápido
-python main.py --urls-file --no-html --model tiny
+python main.py --urls-file --no-report --model tiny
+
+:: Informe en Markdown analizado por Claude (para pasárselo a otra IA)
+python main.py --url "https://www.tiktok.com/@u/video/123..." --provider claude_cli --format markdown
 
 :: Probar el pipeline completo sin gastar cuota de IA
 python main.py --file "C:\Videos\demo.mp4" --provider mock
@@ -496,9 +535,12 @@ output/
 ├── txt/
 │   ├── tiktok_<id>.txt                  (TikTok)
 │   └── local_<nombre>_<fecha>.txt       (archivo local)
-└── html/
-    ├── reporte_tiktok_<id>.html
-    └── reporte_local_<nombre>_<fecha>.html
+├── html/                                (REPORT_FORMAT=html o both)
+│   ├── reporte_tiktok_<id>.html
+│   └── reporte_local_<nombre>_<fecha>.html
+└── markdown/                            (REPORT_FORMAT=markdown o both)
+    ├── reporte_tiktok_<id>.md
+    └── reporte_local_<nombre>_<fecha>.md
 ```
 
 ### Formato del `.txt`
@@ -547,6 +589,14 @@ necesita ese formato puntualmente). Los nombres técnicos (`React`, `Node.js`, `
 dicho en el vídeo, lo inferido y las recomendaciones. Pesa una fracción de lo que pesaba el PDF
 (unos ~8 KB para un informe típico, frente a ~100 KB).
 
+### Estructura del `.md`
+
+Bloque YAML de metadatos (`tipo`, `titulo`, `origen`, `video_id`, `fecha_procesamiento`,
+`idioma_original`, `traducido_al_espanol`, `duracion`, `proveedor_ia`, `modelo_ia`,
+`dificultad`, `generador`) seguido de `# <título>`, una nota (`> **Nota:** …`) si el análisis
+salió degradado, y las mismas secciones `## A. Resumen ejecutivo` … `## L. Conclusión`. Las
+tecnologías van en una tabla Markdown `| Categoría | Elemento |`; no hay gráficos ni estilos.
+
 ---
 
 ## 9. ¿Dónde queda el audio del TikTok?
@@ -588,7 +638,7 @@ Detalles:
 
 ## 10. Cómo se probó
 
-### 10.1. Tests unitarios (`pytest`) — 121, todos en verde
+### 10.1. Tests unitarios (`pytest`) — 143, todos en verde
 
 No hacen descargas reales de TikTok ni llamadas reales a APIs (usan el proveedor `mock`, dobles
 del SDK de Gemini y `monkeypatch`), y no necesitan PyTorch ni un display (`gui.py` no tiene
@@ -604,11 +654,13 @@ tests automatizados por eso mismo).
 | `tests/test_language_detector.py` | Detección es/en, nombres de idioma, `is_spanish`, "Whisper gana" ante discrepancia. |
 | `tests/test_translator.py` | Español → no traduce; inglés → traduce conservando nº de segmentos y timestamps; términos técnicos intactos; lotes grandes (95 segmentos); fallo persistente se contabiliza (no se silencia). |
 | `tests/test_gemini_provider.py` | Clasificación de errores del SDK (auth/rate-limit/sobrecarga 503/genérico), auth no reintenta, autocambio de modelo retirado (case-insensitive, sin bucle), timeout de construcción, **fallback a `GEMINI_FALLBACK_MODEL` tras agotar reintentos**. |
+| `tests/test_claude_cli_provider.py` | Argumentos del CLI (`--system-prompt`, `--json-schema`, `--tools ""`, `--model`, contenido por stdin y no en la línea de comandos), `structured_output` vs `result`, respuesta vacía, timeout, clasificación de errores (sin sesión → auth sin reintento, límite de uso, sobrecarga, `is_error` con código 0), resolución del `claude.exe` real detrás del shim de npm y fallback a `cmd.exe` colapsando saltos de línea. Mockea `shutil.which` y `subprocess.run`. |
+| `tests/test_markdown_generator.py` | Front matter y secciones; el contenido no confiable no puede cerrar el YAML, fabricar encabezados/separadores, romper la tabla ni colar HTML; informe vacío; nota de aviso. |
 | `tests/test_txt_writer.py` | Cabeceras exactas, líneas `[mm:ss]`, dos secciones si hubo traducción, una sola si el original ya era español, nombre de archivo. |
 | `tests/test_ai_parser.py` | `extract_json` (limpio, entre ```` ``` ````, con texto alrededor, anidado, truncado, vacío); `_coerce_report` (relleno de campos, coerción lista↔cadena); `analyze_content` (JSON válido a la 1ª, reintento, doble fallo → informe de reserva, **error del proveedor → informe degradado**, **`AIAuthError` → se propaga**, `user_instructions` se incluye/omite en el prompt). |
 | `tests/test_html_generator.py` | Genera HTML válido (bien formado, sin `<script>`); el contenido de la IA se escapa (anti-XSS, dado que en última instancia viene de un vídeo de terceros); acentos y `¿?`; informe vacío; gráfico SVG solo con ≥2 categorías; insignia de dificultad. |
 
-Comando: `pytest -q` → `121 passed`.
+Comando: `pytest -q` → `143 passed`.
 
 ### 10.2. Prueba end-to-end real
 
@@ -656,6 +708,9 @@ Como TikTok bloquea la IP de descarga en este entorno (comportamiento esperado, 
 | `gemini: el modelo '…' no existe` | Pon un modelo válido en `AI_MODEL` (o `--ai-model`). Gemini intenta autocorregirse; si no puede, indica el nombre nuevo. |
 | Informe degradado con `error 503 UNAVAILABLE` / `high demand` | Capa gratuita de Gemini saturada (temporal, no es un problema de configuración). Ya reintenta con backoff y cae a `GEMINI_FALLBACK_MODEL` si sigue sobrecargado; si aun así falla, espera unos minutos y reprocesa (el `.txt` no se pierde). |
 | `Falta GEMINI_API_KEY` / `clave de API rechazada` | Rellena la clave correcta en `.env`, o usa `--provider mock`. |
+| `No se encontro el CLI de Claude Code` | Instala el CLI (`npm install -g @anthropic-ai/claude-code`) o pon su ruta completa en `CLAUDE_CLI_CMD`. |
+| `el CLI de Claude Code no tiene una sesion valida` | Ejecuta `claude` en una terminal e inicia sesión. |
+| Informe degradado con `limite de uso de Claude alcanzado` | Se agotó el cupo del plan de Claude; espera a que se renueve o usa `--provider gemini` (el `.txt` no se pierde). |
 | Instalación enorme | Es PyTorch (backend Whisper local). Alternativa: `TRANSCRIPTION_BACKEND=openai_api` en `.env`. |
 | `faster-whisper` no instala | No se usa: no tiene soporte para Python 3.13. Este proyecto usa `openai-whisper`. |
 | La 1.ª transcripción tarda mucho | Descarga el modelo Whisper (`small` ≈ 460 MB) una única vez; y en CPU `medium`/`large` son lentos. Usa `small` o `tiny`. |
@@ -684,8 +739,11 @@ Logs detallados: `logs/run_AAAAMMDD.log` (nunca contienen claves).
   español y las reglas anti-alucinación, pero conviene revisar el resultado.
 - **`gui.py` no tiene tests automatizados**: requiere un display, y la CI (GitHub Actions) corre
   headless. Si se toca, verificar a mano con `python main.py --gui`.
+- **`claude_cli` es más lento que una API HTTP**: cada llamada lanza un proceso (~5–10 s), y la
+  traducción hace una llamada por lote de ~40 segmentos. Consume de los límites de uso del plan
+  de Claude; si se agotan, el análisis sale degradado.
 - **OpenAI/DeepSeek existen pero nunca se han validado con una clave real** en este proyecto;
-  solo Gemini se usa y prueba de forma habitual.
+  Gemini y `claude_cli` son los que se usan y prueban de forma habitual.
 
 ---
 
@@ -752,6 +810,26 @@ reales (ReportLab era muy limitado para eso).
 | Renombrados consistentes: `ProcessingResult.pdf_path` → `html_path`, `Config.pdf_dir` → `html_dir` (`output/pdf/` → `output/html/`), `--no-pdf` → `--no-html`. | `src/models.py`, `config.py`, `main.py`, `src/pipeline.py` |
 | `gui.py`: ajuste mínimo (mismo diseño) para reflejar `.html` en el mensaje final. | `gui.py` |
 
-Estado al cierre de esta guía: **121 tests en verde**, HTML verificado con un parser (etiquetas
+Estado al cierre de esa sesión: **121 tests en verde**, HTML verificado con un parser (etiquetas
 balanceadas, sin `<script>`, gráfico SVG presente) al no haber navegador disponible en esa
 sesión para una verificación visual directa.
+
+### 2026-09-29 — Claude (vía Claude Code) y Markdown, como opciones
+
+Motivo: el autor quiere trabajar con Claude y con informes en Markdown (fáciles de leer para
+otra IA), pero manteniendo Gemini y HTML en el repositorio para que cada usuario elija.
+Los valores por defecto del repo no cambian (`AI_PROVIDER=gemini`, `REPORT_FORMAT=html`).
+
+| Cambio | Archivos |
+|---|---|
+| Nuevo proveedor **`claude_cli`**: Claude a través del CLI de Claude Code (`claude -p`), con la sesión del equipo, sin clave de API. Modelo por defecto `sonnet`. | `src/ai_providers/claude_cli_provider.py` (nuevo), `src/ai_providers/__init__.py`, `config.py` |
+| `AIProvider.complete()`/`complete_json()` aceptan un `json_schema` opcional (solo lo reciben proveedores con `supports_json_schema`); traductor y analizador definen el suyo. | `src/ai_providers/base.py`, `src/ai_providers/gemini_provider.py`, `src/translator.py`, `src/ai_analyzer.py` |
+| Nuevo informe **Markdown** (`build_markdown`, front matter YAML + secciones A–L). `REPORT_FORMAT` / `--format` = `html`, `markdown` o `both`. | `src/markdown_generator.py` (nuevo), `src/pipeline.py`, `src/models.py` (`md_path`), `config.py` (`md_dir`) |
+| `--no-html` → `--no-report` (se conserva `--no-html` como alias); `make_html` → `make_report` en el pipeline. Menú con opción «Cambiar formato del informe»; la GUI añade desplegables de proveedor y formato. | `main.py`, `gui.py`, `src/pipeline.py` |
+| La insignia de dificultad del HTML reconoce el nivel aunque venga con tilde («Básico») o con justificación detrás (Claude escribe con acentos). | `src/html_generator.py` |
+| 22 tests nuevos (proveedor `claude_cli`, Markdown, `REPORT_FORMAT`, dificultad). | `tests/` |
+
+Estado al cierre: **143 tests en verde** y E2E real con `claude_cli` + `--format both` sobre un
+audio sintético en inglés: idioma detectado, traducción y análisis en español generados por
+Claude, `.txt`, `.html` y `.md` escritos correctamente (~100 s en total, la mayor parte en
+Whisper).

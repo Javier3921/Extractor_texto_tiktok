@@ -128,3 +128,11 @@ class TestBuildHtml:
         )
         text = out.read_text(encoding="utf-8")
         assert "<script" not in text.lower()
+
+
+class TestDifficultyKey:
+    def test_accents_and_justification(self):
+        from src.html_generator import _difficulty_key
+        assert _difficulty_key("Básico") == "Basico"
+        assert _difficulty_key("Intermedio: requiere conocer REST") == "Intermedio"
+        assert _difficulty_key("") == ""

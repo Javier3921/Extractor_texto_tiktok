@@ -10,6 +10,7 @@ ese contenido se ejecute como codigo en el navegador.
 from __future__ import annotations
 
 import html as html_lib
+import unicodedata
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -99,11 +100,21 @@ def _tech_section(technologies) -> str:
     return _bar_chart(categories) + table
 
 
+def _difficulty_key(level: str) -> str:
+    """Nivel canonico a partir de la respuesta de la IA, que puede venir con
+    tildes ("Básico") o seguida de una justificacion ("Intermedio: porque...")."""
+    words = (level or "").split()
+    first = words[0].strip(".,:;()-").capitalize() if words else ""
+    return "".join(c for c in unicodedata.normalize("NFD", first)
+                   if unicodedata.category(c) != "Mn")
+
+
 def _difficulty_block(level: str) -> str:
     norm = (level or "").strip()
-    color = _DIFFICULTY_COLORS.get(norm, "#555555")
+    key = _difficulty_key(norm)
+    color = _DIFFICULTY_COLORS.get(key, "#555555")
     steps = "".join(
-        f'<span class="diff-step{" active" if d == norm else ""}" '
+        f'<span class="diff-step{" active" if d == key else ""}" '
         f'style="--c:{_DIFFICULTY_COLORS.get(d, "#555555")}">{_esc(d)}</span>'
         for d in _DIFFICULTY_LEVELS
     )

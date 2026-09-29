@@ -15,9 +15,14 @@ from src.utils import ExtractorError
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-VALID_PROVIDERS = ("openai", "gemini", "deepseek", "mock")
+VALID_PROVIDERS = ("openai", "gemini", "deepseek", "claude_cli", "mock")
 VALID_BACKENDS = ("local", "openai_api")
 VALID_WHISPER_MODELS = ("tiny", "base", "small", "medium", "large", "large-v2", "large-v3")
+VALID_REPORT_FORMATS = ("html", "markdown", "both")
+
+# Proveedores que no usan clave de API (claude_cli usa la sesion del CLI de
+# Claude Code ya iniciada en el equipo).
+_KEYLESS_PROVIDERS = ("mock", "claude_cli")
 
 # Modelos por defecto de cada proveedor. OJO: los proveedores retiran modelos
 # con el tiempo; si uno deja de existir, define AI_MODEL en .env con el nuevo
@@ -27,6 +32,7 @@ DEFAULT_AI_MODELS = {
     "openai": "gpt-4o-mini",
     "gemini": "gemini-3.6-flash",
     "deepseek": "deepseek-chat",
+    "claude_cli": "sonnet",   # alias del CLI: siempre apunta al Sonnet mas reciente
     "mock": "mock-1",
 }
 
@@ -50,6 +56,7 @@ def _get_int(name: str, default: int) -> int:
 
 
 DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-flash-lite-latest"
+DEFAULT_CLAUDE_CLI_TIMEOUT = 600
 
 
 @dataclass
@@ -60,6 +67,10 @@ class Config:
     openai_api_key: str = ""
     gemini_api_key: str = ""
     deepseek_api_key: str = ""
+    claude_cli_cmd: str = "claude"
+    claude_cli_timeout: int = DEFAULT_CLAUDE_CLI_TIMEOUT
+
+    report_format: str = "html"
 
     transcription_backend: str = "local"
     transcription_model: str = "small"
@@ -94,6 +105,9 @@ class Config:
             openai_api_key=_get("OPENAI_API_KEY"),
             gemini_api_key=_get("GEMINI_API_KEY"),
             deepseek_api_key=_get("DEEPSEEK_API_KEY"),
+            claude_cli_cmd=_get("CLAUDE_CLI_CMD", "claude"),
+            claude_cli_timeout=_get_int("CLAUDE_CLI_TIMEOUT", DEFAULT_CLAUDE_CLI_TIMEOUT),
+            report_format=_get("REPORT_FORMAT", "html").lower(),
             transcription_backend=_get("TRANSCRIPTION_BACKEND", "local").lower(),
             transcription_model=_get("TRANSCRIPTION_MODEL", "small").lower(),
             output_dir=_dir("OUTPUT_DIRECTORY", "output"),
@@ -115,6 +129,11 @@ class Config:
                 f"AI_PROVIDER invalido: {self.ai_provider!r}. "
                 f"Valores: {', '.join(VALID_PROVIDERS)}"
             )
+        if self.report_format not in VALID_REPORT_FORMATS:
+            raise ExtractorError(
+                f"REPORT_FORMAT invalido: {self.report_format!r}. "
+                f"Valores: {', '.join(VALID_REPORT_FORMATS)}"
+            )
         if self.transcription_backend not in VALID_BACKENDS:
             raise ExtractorError(
                 f"TRANSCRIPTION_BACKEND invalido: {self.transcription_backend!r}. "
@@ -128,7 +147,7 @@ class Config:
 
     def ensure_dirs(self) -> None:
         for d in (self.output_dir, self.output_dir / "txt", self.output_dir / "html",
-                  self.temp_dir, self.logs_dir, self.input_dir):
+                  self.output_dir / "markdown", self.temp_dir, self.logs_dir, self.input_dir):
             Path(d).mkdir(parents=True, exist_ok=True)
 
     # ---------------------------------------------------------------- helpers
@@ -140,6 +159,16 @@ class Config:
     def html_dir(self) -> Path:
         return self.output_dir / "html"
 
+    @property
+    def md_dir(self) -> Path:
+        return self.output_dir / "markdown"
+
+    def report_formats(self) -> tuple[str, ...]:
+        """Formatos de informe a generar ("html", "markdown" o ambos)."""
+        if self.report_format == "both":
+            return ("html", "markdown")
+        return (self.report_format,)
+
     def effective_ai_model(self) -> str:
         return self.ai_model or DEFAULT_AI_MODELS.get(self.ai_provider, "")
 
@@ -149,10 +178,11 @@ class Config:
             "gemini": self.gemini_api_key,
             "deepseek": self.deepseek_api_key,
             "mock": "n/a",
+            "claude_cli": "n/a",
         }.get(provider, "")
 
     def has_key_for(self, provider: str) -> bool:
-        return provider == "mock" or bool(self.api_key_for(provider))
+        return provider in _KEYLESS_PROVIDERS or bool(self.api_key_for(provider))
 
     def resolved_provider(self) -> str:
         """Proveedor que se usara realmente (aplica el fallback a mock si procede)."""
@@ -181,6 +211,9 @@ class Config:
             + ("" if self.has_key_for(self.ai_provider) else "  [SIN CLAVE]"),
             f"Modelo de IA ............. {self.effective_ai_model()}",
             f"Modelo reserva (Gemini) .. {self.gemini_fallback_model or '(desactivado)'}",
+            f"CLI de Claude ............ {self.claude_cli_cmd} "
+            f"(timeout {self.claude_cli_timeout}s)",
+            f"Formato del informe ...... {self.report_format}",
             f"Backend transcripcion .... {self.transcription_backend}",
             f"Modelo Whisper ........... {self.transcription_model}",
             f"Carpeta de salida ........ {self.output_dir}",
