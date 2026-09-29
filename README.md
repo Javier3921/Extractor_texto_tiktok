@@ -1,4 +1,4 @@
-# 🎬 Extractor_texto_tiktok
+# Extractor_texto_tiktok
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
@@ -26,21 +26,21 @@ tu suscripción de Claude, sin clave de API), entre otras. Úsalo desde la líne
 de comandos o desde una pequeña **interfaz gráfica** — solo pega el enlace y,
 si quieres, dile a la IA qué priorizar en el informe.
 
-> **🔒 Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
+> **Privacidad por diseño:** nunca se descarga ni se guarda el vídeo. Solo
 > se obtiene el **audio**, en un archivo temporal que se borra al terminar.
 
 ```mermaid
 flowchart TD
-    A(["🔗 URL de TikTok<br/>o 📁 archivo local"]) --> B["🎧 Obtener audio<br/><sub>yt-dlp · SOLO audio, nunca vídeo</sub>"]
-    B --> C["🎚️ Normalizar audio<br/><sub>FFmpeg → WAV 16 kHz mono</sub>"]
-    C --> D["📝 Transcribir<br/><sub>Whisper (local u API)</sub>"]
-    D --> E{"🌐 ¿Idioma<br/>original?"}
-    E -- Español --> G["📄 Generar .txt"]
-    E -- "Inglés / otro" --> F["🌍 Traducir al español<br/><sub>IA · conserva el original</sub>"]
+    A(["URL de TikTok<br/>o archivo local"]) --> B["Obtener audio<br/><sub>yt-dlp · SOLO audio, nunca vídeo</sub>"]
+    B --> C["Normalizar audio<br/><sub>FFmpeg → WAV 16 kHz mono</sub>"]
+    C --> D["Transcribir<br/><sub>Whisper (local u API)</sub>"]
+    D --> E{"¿Idioma<br/>original?"}
+    E -- Español --> G["Generar .txt"]
+    E -- "Inglés / otro" --> F["Traducir al español<br/><sub>IA · conserva el original</sub>"]
     F --> G
-    G --> H["🧠 Analizar contenido<br/><sub>IA · anti-alucinación</sub>"]
-    H --> I(["🌐 Informe .html<br/><sub>autónomo, con gráficos</sub>"])
-    H --> J(["📝 Informe .md<br/><sub>legible por otra IA</sub>"])
+    G --> H["Analizar contenido<br/><sub>IA · anti-alucinación</sub>"]
+    H --> I(["Informe .html<br/><sub>autónomo, con gráficos</sub>"])
+    H --> J(["Informe .md<br/><sub>legible por otra IA</sub>"])
 
     classDef entrada fill:#4285F4,stroke:#1a56c4,color:#fff
     classDef proceso fill:#f4f6fb,stroke:#4285F4,color:#1a1a1a
@@ -340,12 +340,12 @@ Cambiar de proveedor de IA no requiere tocar el resto del programa (patrón
 
 ```mermaid
 flowchart LR
-    subgraph CLI["🖥️ Entrada"]
+    subgraph CLI["Entrada"]
         M["main.py<br/><sub>argparse + menú</sub>"]
         CFG["config.py<br/><sub>.env → Config</sub>"]
     end
 
-    subgraph PIPE["⚙️ src/pipeline.py — orquestador"]
+    subgraph PIPE["src/pipeline.py — orquestador"]
         direction TB
         S1["tiktok_downloader /<br/>local_video"]
         S2["audio_extractor<br/><sub>FFmpeg</sub>"]
@@ -357,10 +357,10 @@ flowchart LR
         S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
     end
 
-    subgraph AI["🧩 src/ai_providers/ (Strategy)"]
+    subgraph AI["src/ai_providers/ (Strategy)"]
         BASE["base.py<br/><sub>AIProvider (ABC)<br/>reintentos + backoff</sub>"]
-        GEM["gemini_provider.py<br/><sub>✅ en uso — capa gratuita</sub>"]
-        CLA["claude_cli_provider.py<br/><sub>✅ Claude Code CLI</sub>"]
+        GEM["gemini_provider.py<br/><sub>en uso — capa gratuita</sub>"]
+        CLA["claude_cli_provider.py<br/><sub>Claude Code CLI</sub>"]
         OAI["openai_provider.py"]
         DS["deepseek_provider.py"]
         MOCK["mock_provider.py<br/><sub>offline, para tests</sub>"]
@@ -371,7 +371,7 @@ flowchart LR
         BASE -.-> MOCK
     end
 
-    UTILS["🛡️ utils.py<br/><sub>logging seguro · rutas seguras<br/>temp workspace · JSON tolerante</sub>"]
+    UTILS["utils.py<br/><sub>logging seguro · rutas seguras<br/>temp workspace · JSON tolerante</sub>"]
 
     M --> CFG --> PIPE
     S5 -.usa.-> AI
@@ -405,16 +405,16 @@ frentes:
 
 | Medida | Dónde | Por qué |
 |---|---|---|
-| 🔑 **Redacción de secretos en logs** | `utils.py::SecretFilter` | Las claves (`sk-…`, `AIza…`, `Bearer …`) se sustituyen por `[REDACTED]` en consola y archivo de log; `--config` solo muestra la clave enmascarada (`AIza…3456`). |
-| 🧱 **Anti *path traversal*** | `utils.py::safe_output_path` | Los nombres de archivo derivados de datos externos (título del vídeo, id) nunca pueden escribir fuera de `output/`. |
-| 🎯 **Solo contenido público** | `tiktok_downloader.py` | `yt-dlp` se usa sin cookies ni credenciales; nunca se intenta sortear un vídeo privado o con captcha. |
-| 📦 **Límite de tamaño de descarga** | `tiktok_downloader.py` / `local_video.py` | `MAX_VIDEO_MB` limita tanto los archivos locales como el audio descargado de TikTok (`max_filesize` de yt-dlp), evitando descargas desproporcionadas. |
-| ⏱️ **Timeout de red en la IA** | `ai_providers/gemini_provider.py` | Las llamadas a Gemini usan `NETWORK_TIMEOUT` del `.env`; sin esto, una llamada colgada bloquearía el pipeline indefinidamente. |
-| 🛑 **Guardas contra inyección de instrucciones** | `translator.py`, `ai_analyzer.py` | La transcripción es contenido de un tercero no confiable. Los *system prompts* indican explícitamente al modelo que ese texto es **dato a procesar, nunca una instrucción**, aunque contenga frases como "ignora tus reglas". |
-| 🧰 **Claude sin herramientas** | `ai_providers/claude_cli_provider.py` | El CLI de Claude Code se invoca con `--tools ""` y fuera de la carpeta del proyecto: aunque una transcripción intentara dar órdenes, el modelo no tiene forma de ejecutar comandos ni leer archivos. |
-| 🧾 **Markdown sin estructura inyectable** | `markdown_generator.py` | Los metadatos van como cadenas JSON en el bloque YAML y el texto se neutraliza (encabezados, separadores, `<`, `\|` en tablas) para que el contenido de un tercero no pueda falsear la estructura del documento. |
-| 🗑️ **Sin persistencia del vídeo** | `tiktok_downloader.py`, `TempWorkspace` | Solo se guarda el audio, en una carpeta temporal por trabajo que se borra al terminar con éxito. |
-| 🙈 **`.env` fuera del repositorio** | `.gitignore` | Las claves de API, `logs/`, `temp/` y `output/` nunca se suben a Git. |
+| **Redacción de secretos en logs** | `utils.py::SecretFilter` | Las claves (`sk-…`, `AIza…`, `Bearer …`) se sustituyen por `[REDACTED]` en consola y archivo de log; `--config` solo muestra la clave enmascarada (`AIza…3456`). |
+| **Anti *path traversal*** | `utils.py::safe_output_path` | Los nombres de archivo derivados de datos externos (título del vídeo, id) nunca pueden escribir fuera de `output/`. |
+| **Solo contenido público** | `tiktok_downloader.py` | `yt-dlp` se usa sin cookies ni credenciales; nunca se intenta sortear un vídeo privado o con captcha. |
+| **Límite de tamaño de descarga** | `tiktok_downloader.py` / `local_video.py` | `MAX_VIDEO_MB` limita tanto los archivos locales como el audio descargado de TikTok (`max_filesize` de yt-dlp), evitando descargas desproporcionadas. |
+| **Timeout en las llamadas a la IA** | `ai_providers/gemini_provider.py`, `ai_providers/claude_cli_provider.py` | Las llamadas a Gemini usan `NETWORK_TIMEOUT` y las del CLI de Claude `CLAUDE_CLI_TIMEOUT` (`.env`); sin esto, una llamada colgada bloquearía el pipeline indefinidamente. |
+| **Guardas contra inyección de instrucciones** | `translator.py`, `ai_analyzer.py` | La transcripción es contenido de un tercero no confiable. Los *system prompts* indican explícitamente al modelo que ese texto es **dato a procesar, nunca una instrucción**, aunque contenga frases como "ignora tus reglas". |
+| **Claude sin herramientas** | `ai_providers/claude_cli_provider.py` | El CLI de Claude Code se invoca con `--tools ""` y fuera de la carpeta del proyecto: aunque una transcripción intentara dar órdenes, el modelo no tiene forma de ejecutar comandos ni leer archivos. |
+| **Markdown sin estructura inyectable** | `markdown_generator.py` | Los metadatos van como cadenas JSON en el bloque YAML y el texto se neutraliza (encabezados, separadores, `<`, `\|` en tablas) para que el contenido de un tercero no pueda falsear la estructura del documento. |
+| **Sin persistencia del vídeo** | `tiktok_downloader.py`, `TempWorkspace` | Solo se guarda el audio, en una carpeta temporal por trabajo que se borra al terminar con éxito. |
+| **`.env` fuera del repositorio** | `.gitignore` | Las claves de API, `logs/`, `temp/` y `output/` nunca se suben a Git. |
 
 ---
 
@@ -597,6 +597,9 @@ Los logs detallados están en `logs/run_AAAAMMDD.log`.
 - **Capa gratuita de Gemini:** tiene límites de peticiones. Para transcripciones
   largas, la traducción se hace por lotes y con reintentos, pero puedes toparte
   con el límite.
+- **Claude vía CLI (`claude_cli`):** cada llamada lanza un proceso del CLI
+  (unos 5–10 s) y consume de los límites de uso de tu plan de Claude; si se
+  agotan, el `.txt` se genera igual y el informe sale en modo degradado.
 - **Calidad de la traducción/análisis:** depende del proveedor y modelo elegidos.
 - El backend `openai_api` de transcripción no admite audios de más de 25 MB.
 
