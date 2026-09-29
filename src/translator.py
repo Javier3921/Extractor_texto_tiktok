@@ -20,6 +20,23 @@ log = get_logger()
 
 BATCH_SIZE = 40
 
+# Forma exacta de la respuesta; los proveedores con salida estructurada
+# (claude_cli) la usan para forzarla, el resto se guia por el prompt.
+_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "segments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"i": {"type": "integer"}, "text": {"type": "string"}},
+                "required": ["i", "text"],
+            },
+        },
+    },
+    "required": ["segments"],
+}
+
 _SYSTEM = f"""{MARK_TRANSLATE}
 Eres un traductor tecnico profesional. Traduces al ESPANOL manteniendo el
 significado tecnico exacto y un espanol natural (no literal).
@@ -95,7 +112,8 @@ def _translate_batch(chunk: list[Segment], provider: AIProvider,
         + json.dumps(payload, ensure_ascii=False)
     )
     try:
-        raw = provider.complete(_SYSTEM, user, want_json=True, max_tokens=4096)
+        raw = provider.complete(_SYSTEM, user, want_json=True, max_tokens=4096,
+                                json_schema=_JSON_SCHEMA)
         data = extract_json(raw)
         items = data.get("segments", []) if isinstance(data, dict) else []
         by_index = {int(it.get("i", k)): str(it.get("text", "")) for k, it in enumerate(items)}
@@ -124,7 +142,8 @@ def _translate_single(seg: Segment, provider: AIProvider) -> tuple[str, bool]:
         + json.dumps({"segments": [{"i": 0, "text": text}]}, ensure_ascii=False)
     )
     try:
-        data = extract_json(provider.complete(_SYSTEM, user, want_json=True, max_tokens=1024))
+        data = extract_json(provider.complete(_SYSTEM, user, want_json=True, max_tokens=1024,
+                                                json_schema=_JSON_SCHEMA))
         return str(data["segments"][0]["text"]).strip() or text, True
     except AIAuthError:
         raise

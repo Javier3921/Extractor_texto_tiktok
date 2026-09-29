@@ -36,6 +36,11 @@ def get_provider(name: str, cfg: "Config", *, timeout: float | None = None) -> A
         from src.ai_providers.gemini_provider import GeminiProvider
         return GeminiProvider(cfg.gemini_api_key, model, timeout=timeout,
                               fallback_model=cfg.gemini_fallback_model)
+    if name == "claude_cli":
+        from src.ai_providers.claude_cli_provider import ClaudeCliProvider
+        # el CLI tarda mucho mas que una llamada HTTP: timeout propio, no NETWORK_TIMEOUT
+        return ClaudeCliProvider(model, cli_cmd=cfg.claude_cli_cmd,
+                                 timeout=cfg.claude_cli_timeout)
     if name == "deepseek":
         from src.ai_providers.deepseek_provider import DeepSeekProvider
         return DeepSeekProvider(cfg.deepseek_api_key, model)

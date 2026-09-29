@@ -8,6 +8,7 @@ ENV_VARS = [
     "DEEPSEEK_API_KEY", "TRANSCRIPTION_BACKEND", "TRANSCRIPTION_MODEL",
     "OUTPUT_DIRECTORY", "TEMP_DIRECTORY", "LOGS_DIRECTORY", "NETWORK_TIMEOUT",
     "MAX_VIDEO_MB", "ALLOW_MOCK_FALLBACK", "KEEP_TEMP_ON_ERROR",
+    "REPORT_FORMAT", "CLAUDE_CLI_CMD", "CLAUDE_CLI_TIMEOUT",
 ]
 
 
@@ -37,6 +38,7 @@ class TestDefaults:
         cfg = _load(tmp_path)
         assert cfg.txt_dir.exists()
         assert cfg.html_dir.exists()
+        assert cfg.md_dir.exists()
         assert cfg.temp_dir.exists()
         assert cfg.logs_dir.exists()
 
@@ -87,3 +89,40 @@ class TestKeysAndProviders:
         cfg = _load(tmp_path)
         assert cfg.has_key_for("mock")
         assert cfg.resolved_provider() == "mock"
+
+
+class TestReportFormat:
+    def test_default_is_html(self, clean_env, tmp_path):
+        cfg = _load(tmp_path)
+        assert cfg.report_format == "html"
+        assert cfg.report_formats() == ("html",)
+
+    def test_markdown(self, clean_env, tmp_path, monkeypatch):
+        monkeypatch.setenv("REPORT_FORMAT", "Markdown")
+        assert _load(tmp_path).report_formats() == ("markdown",)
+
+    def test_both(self, clean_env, tmp_path, monkeypatch):
+        monkeypatch.setenv("REPORT_FORMAT", "both")
+        assert _load(tmp_path).report_formats() == ("html", "markdown")
+
+    def test_bad_format(self, clean_env, tmp_path, monkeypatch):
+        monkeypatch.setenv("REPORT_FORMAT", "pdf")
+        with pytest.raises(ExtractorError):
+            _load(tmp_path)
+
+
+class TestClaudeCli:
+    def test_keyless_and_default_model(self, clean_env, tmp_path, monkeypatch):
+        monkeypatch.setenv("AI_PROVIDER", "claude_cli")
+        monkeypatch.setenv("ALLOW_MOCK_FALLBACK", "true")
+        cfg = _load(tmp_path)
+        assert cfg.has_key_for("claude_cli")
+        assert cfg.resolved_provider() == "claude_cli"   # no cae a mock
+        assert cfg.effective_ai_model() == DEFAULT_AI_MODELS["claude_cli"]
+
+    def test_cli_settings(self, clean_env, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CLI_CMD", r"C:\tools\claude.exe")
+        monkeypatch.setenv("CLAUDE_CLI_TIMEOUT", "120")
+        cfg = _load(tmp_path)
+        assert cfg.claude_cli_cmd == r"C:\tools\claude.exe"
+        assert cfg.claude_cli_timeout == 120

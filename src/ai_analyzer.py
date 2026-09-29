@@ -28,6 +28,27 @@ _SCHEMA_KEYS_STR = ("title", "original_language", "executive_summary",
 _SCHEMA_KEYS_LIST = ("technologies", "technical_concepts", "best_practices",
                      "risks", "recommendations", "applications")
 
+# Espejo del esquema pedido en _SYSTEM; los proveedores con salida
+# estructurada (claude_cli) lo usan para forzar la forma de la respuesta.
+_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        **{k: {"type": "string"} for k in _SCHEMA_KEYS_STR},
+        **{k: {"type": "array", "items": {"type": "string"}}
+           for k in _SCHEMA_KEYS_LIST if k != "technologies"},
+        "translated_to_spanish": {"type": "boolean"},
+        "technologies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"category": {"type": "string"}, "name": {"type": "string"}},
+                "required": ["category", "name"],
+            },
+        },
+    },
+    "required": [*_SCHEMA_KEYS_STR, *_SCHEMA_KEYS_LIST, "translated_to_spanish"],
+}
+
 _SYSTEM = f"""{MARK_ANALYZE}
 Eres un analista tecnico senior. Analizas la transcripcion de un video tecnico
 y produces un informe RIGUROSO en ESPANOL.
@@ -97,7 +118,8 @@ def analyze_content(*, spanish_text: str, original_text: str | None,
     log.info("Enviando contenido a %s para analisis tecnico...", provider.name)
 
     try:
-        raw = provider.complete(_SYSTEM, user, want_json=True, max_tokens=6000)
+        raw = provider.complete(_SYSTEM, user, want_json=True, max_tokens=6000,
+                                json_schema=_JSON_SCHEMA)
         try:
             data = extract_json(raw)
         except JSONParseError:
@@ -106,7 +128,7 @@ def analyze_content(*, spanish_text: str, original_text: str | None,
                 _SYSTEM,
                 user + "\n\nIMPORTANTE: responde EXCLUSIVAMENTE con el objeto JSON, "
                        "sin ```, sin explicaciones.",
-                want_json=True, max_tokens=6000,
+                want_json=True, max_tokens=6000, json_schema=_JSON_SCHEMA,
             )
             try:
                 data = extract_json(raw)

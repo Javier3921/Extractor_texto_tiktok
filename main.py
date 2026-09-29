@@ -7,6 +7,7 @@ Uso:
     python main.py --file "C:\\v\\video.mp4"     -> procesar un video local
     python main.py --urls-file input/urls.txt   -> procesar varias URLs
     python main.py --provider gemini --url ...  -> forzar proveedor de IA
+    python main.py --provider claude_cli --format markdown --url ...
     python main.py --url ... --instructions "Enfocate en los riesgos de seguridad"
     python main.py --config                     -> ver configuracion
 """
@@ -19,7 +20,8 @@ from pathlib import Path
 # Permite ejecutar el script directamente (añade la raiz del proyecto al path).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import PROJECT_ROOT, VALID_PROVIDERS, VALID_WHISPER_MODELS, Config  # noqa: E402
+from config import (PROJECT_ROOT, VALID_PROVIDERS, VALID_REPORT_FORMATS,  # noqa: E402
+                    VALID_WHISPER_MODELS, Config)
 from src.utils import ExtractorError, read_urls_file, setup_logging  # noqa: E402
 
 BANNER = r"""
@@ -34,7 +36,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="Extractor_texto_tiktok",
         description="TikTok/video -> transcripcion -> traduccion ES -> TXT -> "
-                    "analisis IA -> informe HTML.",
+                    "analisis IA -> informe HTML y/o Markdown.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     src = p.add_mutually_exclusive_group()
@@ -48,7 +50,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
                    help="Modelo concreto del proveedor de IA (sobrescribe AI_MODEL)")
     p.add_argument("--model", choices=VALID_WHISPER_MODELS,
                    help="Modelo de Whisper (sobrescribe .env)")
-    p.add_argument("--no-html", action="store_true", help="No generar el informe HTML")
+    p.add_argument("--format", choices=VALID_REPORT_FORMATS, dest="report_format",
+                   help="Formato del informe: html, markdown o both (sobrescribe "
+                        "REPORT_FORMAT)")
+    # --no-html se conserva como alias por compatibilidad con versiones anteriores
+    p.add_argument("--no-report", "--no-html", dest="no_report", action="store_true",
+                   help="No generar el informe (solo el .txt)")
     p.add_argument("--keep-temp", action="store_true",
                    help="Conservar la carpeta temporal aunque todo vaya bien")
     p.add_argument("--instructions", metavar="TEXTO", default="",
@@ -70,6 +77,8 @@ def load_config(args: argparse.Namespace) -> Config:
         cfg.ai_model = args.ai_model
     if getattr(args, "model", None):
         cfg.transcription_model = args.model
+    if getattr(args, "report_format", None):
+        cfg.report_format = args.report_format
     if getattr(args, "keep_temp", False):
         cfg.always_keep_temp = True
     return cfg
@@ -94,7 +103,7 @@ def show_config(cfg: Config) -> None:
 
 
 # --------------------------------------------------------------------------
-def run_batch(urls: list[str], cfg: Config, make_html: bool, *,
+def run_batch(urls: list[str], cfg: Config, make_report: bool, *,
              user_instructions: str = "") -> int:
     from src.pipeline import process_url
     if not urls:
@@ -106,7 +115,7 @@ def run_batch(urls: list[str], cfg: Config, make_html: bool, *,
         print("=" * 60)
         print(f"  ({i}/{len(urls)})  {url}")
         print("=" * 60)
-        results.append(process_url(url, cfg, make_html=make_html,
+        results.append(process_url(url, cfg, make_report=make_report,
                                    user_instructions=user_instructions))
 
     ok = sum(1 for r in results if r.ok)
@@ -129,13 +138,15 @@ def interactive_menu(cfg: Config) -> int:
         print(f"  Proveedor IA actual: {cfg.ai_provider}"
               f"{'' if cfg.has_key_for(cfg.ai_provider) else '  [SIN CLAVE]'}")
         print(f"  Modelo Whisper: {cfg.transcription_model}")
+        print(f"  Formato del informe: {cfg.report_format}")
         print()
         print("  1. Procesar un TikTok")
         print("  2. Procesar multiples TikToks (input/urls.txt)")
         print("  3. Procesar archivo de video local")
         print("  4. Cambiar proveedor de IA")
-        print("  5. Ver configuracion")
-        print("  6. Salir")
+        print("  5. Cambiar formato del informe")
+        print("  6. Ver configuracion")
+        print("  7. Salir")
         print()
         choice = input("  Opcion > ").strip()
 
@@ -153,7 +164,7 @@ def interactive_menu(cfg: Config) -> int:
             ).strip()
             try:
                 urls = read_urls_file(_resolve(path))
-                run_batch(urls, cfg, make_html=True, user_instructions=instructions)
+                run_batch(urls, cfg, make_report=True, user_instructions=instructions)
             except ExtractorError as e:
                 print(f"  [ERROR] {e}")
         elif choice == "3":
@@ -166,9 +177,11 @@ def interactive_menu(cfg: Config) -> int:
         elif choice == "4":
             _change_provider(cfg)
         elif choice == "5":
+            _change_format(cfg)
+        elif choice == "6":
             show_config(cfg)
             input("  (Enter para continuar) ")
-        elif choice == "6" or choice.lower() in ("q", "salir", "exit"):
+        elif choice == "7" or choice.lower() in ("q", "salir", "exit"):
             print("  Hasta luego.")
             return 0
         else:
@@ -191,6 +204,20 @@ def _change_provider(cfg: Config) -> None:
             print("  [AVISO] Ese proveedor no tiene API key configurada en .env.")
     else:
         print("  Proveedor no valido.")
+
+
+def _change_format(cfg: Config) -> None:
+    print("\n  Formatos disponibles:")
+    for i, f in enumerate(VALID_REPORT_FORMATS, start=1):
+        print(f"    {i}. {f}")
+    sel = input("  Nuevo formato > ").strip().lower()
+    if sel.isdigit() and 1 <= int(sel) <= len(VALID_REPORT_FORMATS):
+        sel = VALID_REPORT_FORMATS[int(sel) - 1]
+    if sel in VALID_REPORT_FORMATS:
+        cfg.report_format = sel
+        print(f"  Formato cambiado a '{sel}' (solo para esta sesion).")
+    else:
+        print("  Formato no valido.")
 
 
 def _resolve(path: str) -> Path:
@@ -219,21 +246,21 @@ def main(argv: list[str] | None = None) -> int:
         run_gui(cfg)
         return 0
 
-    make_html = not args.no_html
+    make_report = not args.no_report
     instructions = args.instructions
 
     try:
         if args.url:
             from src.pipeline import process_url
-            r = process_url(args.url, cfg, make_html=make_html, user_instructions=instructions)
+            r = process_url(args.url, cfg, make_report=make_report, user_instructions=instructions)
             return 0 if r.ok else 2
         if args.file:
             from src.pipeline import process_file
-            r = process_file(args.file, cfg, make_html=make_html, user_instructions=instructions)
+            r = process_file(args.file, cfg, make_report=make_report, user_instructions=instructions)
             return 0 if r.ok else 2
         if args.urls_file is not None:
             urls = read_urls_file(_resolve(args.urls_file))
-            return run_batch(urls, cfg, make_html=make_html, user_instructions=instructions)
+            return run_batch(urls, cfg, make_report=make_report, user_instructions=instructions)
         return interactive_menu(cfg)
     except KeyboardInterrupt:
         print("\n[INTERRUMPIDO] Cancelado por el usuario.")

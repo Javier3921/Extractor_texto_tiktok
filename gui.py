@@ -1,8 +1,9 @@
 """Interfaz grafica minima (Tkinter, sin dependencias nuevas).
 
 Pide la URL de un video de TikTok y, opcionalmente, indicaciones para la IA
-sobre que priorizar en el informe. Al terminar, muestra en un mensaje donde
-quedaron guardados el .txt y el informe .html (rutas y nombres de archivo).
+sobre que priorizar en el informe; permite elegir proveedor de IA y formato
+del informe (valores iniciales: los del .env). Al terminar, muestra en un
+mensaje donde quedaron guardados el .txt y el informe .html/.md.
 
 Uso:
     python main.py --gui
@@ -13,7 +14,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from config import Config
+from config import VALID_PROVIDERS, VALID_REPORT_FORMATS, Config
 from src.models import ProcessingResult
 from src.utils import ExtractorError
 
@@ -21,7 +22,7 @@ from src.utils import ExtractorError
 def run_gui(cfg: Config) -> None:
     root = tk.Tk()
     root.title("Extractor_texto_tiktok")
-    root.geometry("560x460")
+    root.geometry("560x500")
     root.minsize(480, 420)
 
     pad = {"padx": 16, "pady": (10, 2)}
@@ -38,8 +39,23 @@ def run_gui(cfg: Config) -> None:
     instructions_txt = tk.Text(root, height=9, wrap="word")
     instructions_txt.pack(fill="both", expand=True, padx=16)
 
-    provider_note = cfg.ai_provider + ("" if cfg.has_key_for(cfg.ai_provider) else "  [SIN CLAVE]")
-    status_var = tk.StringVar(value=f"Proveedor de IA: {provider_note}")
+    options = tk.Frame(root)
+    options.pack(fill="x", padx=16, pady=(10, 0))
+    tk.Label(options, text="Proveedor de IA").pack(side="left")
+    provider_var = tk.StringVar(value=cfg.ai_provider)
+    ttk.Combobox(options, textvariable=provider_var, values=VALID_PROVIDERS,
+                 state="readonly", width=12).pack(side="left", padx=(6, 18))
+    tk.Label(options, text="Formato del informe").pack(side="left")
+    format_var = tk.StringVar(value=cfg.report_format)
+    ttk.Combobox(options, textvariable=format_var, values=VALID_REPORT_FORMATS,
+                 state="readonly", width=10).pack(side="left", padx=(6, 0))
+
+    def provider_note() -> str:
+        prov = provider_var.get()
+        return f"Proveedor de IA: {prov}" + ("" if cfg.has_key_for(prov) else "  [SIN CLAVE]")
+
+    status_var = tk.StringVar(value=provider_note())
+    provider_var.trace_add("write", lambda *_: status_var.set(provider_note()))
     tk.Label(root, textvariable=status_var, anchor="w", fg="#555").pack(
         fill="x", padx=16, pady=(10, 0))
 
@@ -70,7 +86,9 @@ def run_gui(cfg: Config) -> None:
             if result.txt_path:
                 lines.append(f"Transcripcion (.txt):\n{result.txt_path}\n")
             if result.html_path:
-                lines.append(f"Informe tecnico (.html):\n{result.html_path}")
+                lines.append(f"Informe tecnico (.html):\n{result.html_path}\n")
+            if result.md_path:
+                lines.append(f"Informe tecnico (.md):\n{result.md_path}")
             messagebox.showinfo("Informe generado", "\n".join(lines))
         else:
             status_var.set("Fallo el procesamiento.")
@@ -79,7 +97,7 @@ def run_gui(cfg: Config) -> None:
     def worker(url: str, instructions: str) -> None:
         from src.pipeline import process_url
         try:
-            result = process_url(url, cfg, make_html=True, user_instructions=instructions)
+            result = process_url(url, cfg, make_report=True, user_instructions=instructions)
         except ExtractorError as e:
             root.after(0, finish_error, str(e))
             return
@@ -94,6 +112,9 @@ def run_gui(cfg: Config) -> None:
             messagebox.showwarning("Falta la URL", "Ingresa la URL de un video de TikTok.")
             return
         instructions = instructions_txt.get("1.0", "end").strip()
+        # solo en memoria para esta sesion, igual que los flags de la CLI
+        cfg.ai_provider = provider_var.get()
+        cfg.report_format = format_var.get()
         set_busy(True)
         status_var.set("Procesando... puede tardar varios minutos (transcripcion con Whisper).")
         threading.Thread(target=worker, args=(url, instructions), daemon=True).start()
